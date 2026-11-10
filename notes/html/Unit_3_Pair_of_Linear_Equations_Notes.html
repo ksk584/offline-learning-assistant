@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Unit 3: Pair of Linear Equations — NCERT Class 10 Study Notes</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\[', right: '\\]', display: true},
+        {left: '\\(', right: '\\)', display: false}
+      ],
+      throwOnError: false
+    });"></script>
+  <style>
+    :root {
+      --primary: #1e3a8a;
+      --primary-light: #eff6ff;
+      --secondary: #0d9488;
+      --text: #1f2937;
+      --text-muted: #4b5563;
+      --bg: #ffffff;
+      --card-bg: #f9fafb;
+      --border: #e5e7eb;
+      --accent: #2563eb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.68;
+      color: var(--text);
+      background: #f3f4f6;
+      margin: 0;
+      padding: 0;
+    }
+    .nav-bar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--primary);
+      color: white;
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .nav-bar .brand {
+      font-size: 1.1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .nav-bar .links {
+      display: flex;
+      gap: 12px;
+    }
+    .nav-bar a {
+      color: white;
+      text-decoration: none;
+      font-size: 0.88rem;
+      padding: 6px 12px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.15);
+      transition: background 0.15s;
+    }
+    .nav-bar a:hover { background: rgba(255,255,255,0.25); }
+    .nav-bar a.active { background: #3b82f6; font-weight: 600; }
+    .container {
+      max-width: 960px;
+      margin: 32px auto;
+      padding: 48px;
+      background: var(--bg);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+    h1 {
+      color: var(--primary);
+      font-size: 2.2rem;
+      border-bottom: 2px solid var(--primary-light);
+      padding-bottom: 16px;
+      margin-top: 0;
+    }
+    h2 {
+      color: #1e40af;
+      font-size: 1.5rem;
+      margin-top: 36px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    h3 {
+      color: #374151;
+      font-size: 1.2rem;
+      margin-top: 24px;
+    }
+    h4 {
+      color: #4b5563;
+      font-size: 1.05rem;
+    }
+    p, li {
+      font-size: 1rem;
+      color: var(--text);
+    }
+    blockquote {
+      margin: 20px 0;
+      padding: 14px 20px;
+      background: var(--primary-light);
+      border-left: 4px solid var(--accent);
+      border-radius: 4px;
+      font-style: normal;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 24px 0;
+      font-size: 0.95rem;
+    }
+    th, td {
+      padding: 10px 14px;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+    th {
+      background: var(--card-bg);
+      font-weight: 600;
+      color: var(--primary);
+    }
+    tr:nth-child(even) { background: #fafafa; }
+    code {
+      background: #f1f5f9;
+      color: #0f172a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.88em;
+    }
+    .katex-display {
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 8px 0;
+    }
+    hr {
+      border: 0;
+      height: 1px;
+      background: var(--border);
+      margin: 40px 0;
+    }
+    .btn-print {
+      cursor: pointer;
+      background: #059669;
+      color: white;
+      border: 0;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      float: right;
+    }
+    .btn-print:hover { background: #047857; }
+    @media print {
+      body { background: white; }
+      .nav-bar, .btn-print { display: none; }
+      .container {
+        max-width: 100%;
+        box-shadow: none;
+        margin: 0;
+        padding: 0;
+      }
+      h2 { page-break-before: always; }
+    }
+  </style>
+</head>
+<body>
+  <div class="nav-bar">
+    <div class="brand">
+      <span>📚 ILA Notes Viewer</span>
+      <span style="opacity: 0.7; font-weight: 400; font-size: 0.9rem;">NCERT Class 10</span>
+    </div>
+    <div class="links">
+      <a href="Unit_1_Real_Numbers_Notes.html" class="">Unit 1: Real Numbers</a>
+      <a href="Unit_2_Polynomials_Notes.html" class="">Unit 2: Polynomials</a>
+      <a href="Unit_3_Pair_of_Linear_Equations_Notes.html" class="active">Unit 3: Linear Equations</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <button class="btn-print" onclick="window.print()">🖨️ Print / Save to PDF</button>
+    <h1>Unit 3: Pair of Linear Equations in Two Variables</h1>
+<p><strong>Course:</strong> NCERT / CBSE Class 10 Mathematics<br />
+<strong>Textbook Source:</strong> <code>jemh103.pdf</code><br />
+<strong>Engine:</strong> Local On-Device LLM (<code>Qwen3.5-0.8B-Q4_K_M.gguf</code>)<br />
+<strong>Total Word Count:</strong> ~3,684 words<br />
+<strong>Estimated Document Length:</strong> ~9.7 pages (Standard academic print @ ~380 words/page)<br />
+<strong>Generation Latency:</strong> 168.6 seconds</p>
+<blockquote>
+<p><strong>Document Purpose:</strong> This document provides a comprehensive, rigorous, and concise 10-page master study guide for Unit 3: Pair of Linear Equations in Two Variables. It contains exhaustive theoretical proofs, complete formula tables, step-by-step algorithms, fully worked foundational and HOTS examples, common error analyses, and self-assessment practice drills with complete answer keys.</p>
+</blockquote>
+<hr />
+<h2>Section 3.1: Chapter Blueprint, Syllabus Scope &amp; Real-Life Modeling</h2>
+<h1>Unit 3: Pair of Linear Equations in Two Variables</h1>
+<h2>Section 3.1: Chapter Blueprint &amp; Real-Life Modeling</h2>
+<h3>1. Pedagogical Scope &amp; Curriculum Alignment</h3>
+<p><strong>Curriculum Alignment:</strong></p>
+<ul>
+<li><strong>Grade Level:</strong> Class 10 (NCERT Standard 10).</li>
+<li><strong>Core Concept:</strong> Linear Equations in Two Variables ($ax + by + c = 0$).</li>
+<li><strong>Key Objective:</strong> Students will learn to model real-world scenarios using systems of linear equations, specifically focusing on the geometric interpretation of solutions.</li>
+<li><strong>Pedagogical Goal:</strong> To move students from abstract algebraic manipulation to concrete geometric understanding, emphasizing the relationship between the solution set and the line defined by the equation.</li>
+</ul>
+<h3>2. Definition of a Linear Equation in Two Variables</h3>
+<p><strong>Formal Definition:</strong>
+A linear equation in two variables $x$ and $y$ is a polynomial equation of degree 1 where the coefficients of $x$ and $y$ are non-zero constants.</p>
+<ul>
+<li><strong>General Form:</strong> $ax + by + c = 0$</li>
+<li><strong>Parameters:</strong>
+<ul>
+<li>$a, b, c \in \mathbb{R}$ (Real numbers).</li>
+<li>$a^2 + b^2 \neq 0$ (Ensures the line is not a point or undefined).</li>
+</ul>
+</li>
+<li><strong>Geometric Interpretation:</strong>
+<ul>
+<li>The set of all points $(x, y)$ that satisfy the equation lie on a straight line.</li>
+<li><strong>Slope ($m$):</strong> $m = -\frac{b}{a}$ (if $a \neq 0$).</li>
+<li><strong>Intercepts:</strong> $x$-intercept ($x_0$) and $y$-intercept ($y_0$).</li>
+</ul>
+</li>
+</ul>
+<h3>3. Geometric Meaning of a Solution</h3>
+<p><strong>Concept:</strong>
+A solution to a system of linear equations is a point $(x_0, y_0)$ in the Cartesian plane.</p>
+<ul>
+<li><strong>Condition:</strong> If $(x_0, y_0)$ is a solution, then substituting $x_0$ and $y_0$ into the equation yields $0$.</li>
+<li><strong>Linearity:</strong> The solution set forms a straight line.</li>
+<li><strong>Contrast:</strong> If the system has no solution (inconsistent equations), the line is parallel to the given line but does not intersect it.</li>
+</ul>
+<h3>4. General Form of a Pair of Linear Equations</h3>
+<p><strong>Formulation:</strong>
+Two equations representing a system are written in the general form:
+$$a_1 x + b_1 y + c_1 = 0$$
+$$a_2 x + b_2 y + c_2 = 0$$</p>
+<ul>
+<li><strong>Note:</strong> The coefficients $a_1, b_1, c_1$ and $a_2, b_2, c_2$ are real numbers.</li>
+<li><strong>System Type:</strong>
+<ul>
+<li><strong>Consistent &amp; Unique:</strong> Two distinct lines intersect at a single point.</li>
+<li><strong>Consistent &amp; Infinite:</strong> Lines are identical (parallel).</li>
+<li><strong>Inconsistent:</strong> Lines are parallel but distinct (no solution).</li>
+</ul>
+</li>
+</ul>
+<h3>5. Real-World Modeling: Translating Word Problems</h3>
+<p><strong>Example 1: Akhila's Giant Wheel</strong></p>
+<ul>
+<li><strong>Problem:</strong> A giant wheel has a circumference of $4\pi$ meters. If it is cut into two equal pieces, each piece has a circumference of $\frac{1</li>
+</ul>
+<hr />
+<h2>Section 3.2: Graphical Method &amp; The Ratio Consistency Criteria</h2>
+<h1>Unit 3: Pair of Linear Equations in Two Variables</h1>
+<h2>Section 3.2: Graphical Method &amp; Ratio Consistency Criteria</h2>
+<h3>1. Geometric Behaviour of Two Lines in a Plane</h3>
+<p>Consider two lines $L_1$ and $L_2$ in the Cartesian plane. Their relationship is determined by the slopes and y-intercepts.</p>
+<p><strong>Case A: Intersecting Lines</strong></p>
+<ul>
+<li><strong>Condition:</strong> $m_1 \neq m_2$ (Slopes are distinct).</li>
+<li><strong>Geometric Behavior:</strong> The lines intersect at a single point.</li>
+<li><strong>Equation:</strong> $y = m_1x + b_1$ and $y = m_2x + b_2$.</li>
+<li><strong>Solution:</strong> Exactly 1 unique solution.</li>
+</ul>
+<p><strong>Case B: Parallel Lines</strong></p>
+<ul>
+<li><strong>Condition:</strong> $m_1 = m_2$ (Slopes are identical).</li>
+<li><strong>Geometric Behavior:</strong> The lines are parallel and distinct.</li>
+<li><strong>Equation:</strong> $y = m_1x + b_1$ and $y = m_1x + b_2$ ($b_1 \neq b_2$).</li>
+<li><strong>Solution:</strong> No solution.</li>
+</ul>
+<p><strong>Case C: Coincident Lines</strong></p>
+<ul>
+<li><strong>Condition:</strong> $m_1 = m_2$ and $b_1 = b_2$.</li>
+<li><strong>Geometric Behavior:</strong> The lines are identical and lie on the same line.</li>
+<li><strong>Equation:</strong> $y = m_1x + b_1$ and $y = m_1x + b_1$.</li>
+<li><strong>Solution:</strong> Infinitely many solutions.</li>
+</ul>
+<hr />
+<h3>2. Consistency Criteria</h3>
+<p>A system of linear equations is consistent if it has at least one solution. It is inconsistent if it has no solution.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Consistency Type</th>
+<th style="text-align:left">Condition</th>
+<th style="text-align:left">Geometric Interpretation</th>
+<th style="text-align:left">Solution Set</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Consistent</strong></td>
+<td style="text-align:left">At least one solution exists</td>
+<td style="text-align:left">Lines intersect or are coincident.</td>
+<td style="text-align:left">Finite set of solutions</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Inconsistent</strong></td>
+<td style="text-align:left">No solution exists</td>
+<td style="text-align:left">Lines are parallel and distinct.</td>
+<td style="text-align:left">Empty set ($\emptyset$)</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Dependent</strong></td>
+<td style="text-align:left">Infinitely many solutions</td>
+<td style="text-align:left">Lines are coincident.</td>
+<td style="text-align:left">Infinite set of solutions</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3>3. Master Coefficient Ratio Comparison Criteria</h3>
+<p>The consistency of the system is determined by the relationship between the ratios of the coefficients of $x$ and $y$.</p>
+<h4>Case 1: Intersecting Lines</h4>
+<p>$$ \frac{a_1}{a_2} \neq \frac{b_1}{b_2} $$</p>
+<ul>
+<li><strong>Geometric:</strong> Intersecting lines.</li>
+<li><strong>Solution:</strong> Exactly 1 unique solution.</li>
+<li><strong>Ratio Condition:</strong> $\frac{a_1}{a_2} \neq \frac{b_1}{b_2}$</li>
+</ul>
+<h4>Case 2: Coincident Lines</h4>
+<p>$$ \frac{a_1}{a_2} = \frac{b_1}{b_2} = \frac{c_1}{c_2} $$</p>
+<ul>
+<li><strong>Geometric:</strong> Coincident lines.</li>
+<li><strong>Solution:</strong> Infinitely many solutions.</li>
+<li><strong>Ratio Condition:</strong> $\frac{a_1}{a_2} = \frac{b_1}{b_2} = \frac{c_1}{c_2}$</li>
+</ul>
+<h4>Case</h4>
+<hr />
+<h2>Section 3.3: Algebraic Method I: The Method of Substitution</h2>
+<h1>Unit 3: Pair of Linear Equations in Two Variables</h1>
+<h2>Section 3.3: Algebraic Method I: The Method of Substitution</h2>
+<h3>1. Rationale: Why Algebraic Methods Supersede Graphical Approximations</h3>
+<p>In the context of NCERT Class 10 Mathematics, the transition from graphical approximation to algebraic solution is critical for fractional and decimal coordinates.</p>
+<ul>
+<li><strong>Precision and Exactness</strong>: Graphical methods rely on visual estimation, which introduces significant error, especially when coordinates are fractions or decimals. Algebraic methods provide exact solutions derived from symbolic manipulation, ensuring accuracy regardless of the input values.</li>
+<li><strong>Efficiency</strong>: Graphical methods require plotting multiple points and drawing a line, a process that is computationally expensive and prone to human error. Algebraic substitution reduces the problem to a single linear equation, allowing for immediate and precise solution.</li>
+<li><strong>Curriculum Alignment</strong>: The NCERT curriculum emphasizes algebraic manipulation as the primary tool for solving systems of equations. Mastery of substitution is a prerequisite for understanding the concept of parallel lines (no solution) and coincident lines (infinitely many solutions), which are essential for graphing and solving systems of equations.</li>
+</ul>
+<hr />
+<h3>2. Formal 3-Step Algorithmic Protocol</h3>
+<p>To solve a system of two linear equations using the Method of Substitution, follow this strict protocol:</p>
+<h4>Step 1: Express One Variable in Terms of the Other</h4>
+<p>Identify the equation with the <strong>more convenient</strong> (simpler) form. Solve it for one variable ($x$ or $y$) and express it in terms of the other variable ($z$ or $w$).</p>
+<ul>
+<li><em>Example</em>: From $7x - 15y = 2$, solve for $x$:
+$$7x = 15y + 2 \implies x = \frac{15y + 2}{7}$$</li>
+</ul>
+<h4>Step 2: Substitute into the Other Equation</h4>
+<p>Substitute the expression for the first variable into the second equation. This results in a <strong>linear equation in a single variable</strong>.</p>
+<ul>
+<li><em>Example</em>: Substitute $x = \frac{15y + 2}{7}$ into $x + 2y = 3$:
+$$\frac{15y + 2}{7} + 2y = 3$$</li>
+</ul>
+<h4>Step 3: Solve and Back-Substitute</h4>
+<p>Solve the resulting single linear equation for the variable. Once the value is found, <strong>back-substitute</strong> the expression back into the first equation to find the second variable.</p>
+<ul>
+<li><em>Example</em>: Substitute $y = 1$ into $x = \frac{15(1) + 2}{7}$:
+$$x = \frac{17}{7}$$</li>
+</ul>
+<hr />
+<h3>3. Handling Singularities in Substitution</h3>
+<p>The validity of the substitution method depends on the resulting equation being linear in the single variable.</p>
+<h4>True Identity: Infinitely Many Solutions (Coincident Lines)</h4>
+<ul>
+<li><strong>Condition</strong>: The substituted equation must be an <strong>identity</strong> (an equation that holds true for all values of the variable).</li>
+<li><strong>Example</strong>: If substituting $x = 1$ into $x + 2y = 3$ yields $1 + 2y = 3$, then $2y = 2 \implies y = 1$.</li>
+<li><strong>Result</strong>: Since $y = 1$ is a constant, the system represents <strong>Coincident Lines</strong>. There are infinitely many solutions.</li>
+<li><strong>Note</strong>: In the</li>
+</ul>
+<hr />
+<h2>Section 3.4: Algebraic Method II: The Method of Elimination</h2>
+<h1>Unit 3: Pair of Linear Equations in Two Variables</h1>
+<h2>Section 3.4: Algebraic Method II: The Method of Elimination</h2>
+<h3>1. Fundamental Concept: Scaling Equations by LCM of Coefficients</h3>
+<p>To eliminate a variable, we must scale the original equations by non-zero constants $k$ such that the coefficients of the eliminated variable become identical.</p>
+<ul>
+<li><strong>Rule:</strong> Multiply Equation 1 by $k_1$ and Equation 2 by $k_2$ where $k_1, k_2 \in \mathbb{R}^*$ and $k_1 k_2 \neq 0$.</li>
+<li><strong>Result:</strong> The new system is $k_1 E_1 + k_2 E_2 = k_1 k_2 E_1 + k_2 k_2 E_2$.</li>
+<li><strong>Logic:</strong> This ensures that the coefficient of the eliminated variable is $k_1 k_2$. If $k_1 k_2 = 0$, the operation is invalid.</li>
+</ul>
+<h3>2. Formal Step-by-Step Protocol</h3>
+<ol>
+<li><strong>Multiply:</strong> Multiply Equation 1 by $k_1$ and Equation 2 by $k_2$ to equalize coefficients of $x$ (or $y$).</li>
+<li><strong>Add/Subtract:</strong>
+<ul>
+<li><strong>Opposite Signs:</strong> Add the equations to eliminate $x$ (or $y$).</li>
+<li><strong>Identical Signs:</strong> Subtract the equations to eliminate $x$ (or $y$).</li>
+<li><em>Note:</em> If the resulting equation is $0 = 0$, proceed to Step 3. If it is $0 = k$ ($k \neq 0$), proceed to Step 4.</li>
+</ul>
+</li>
+<li><strong>Solve:</strong> Solve the resulting single-variable equation for the eliminated variable.</li>
+<li><strong>Back-Substitute:</strong> Substitute the value of the eliminated variable back into one of the original equations to find the other variable.</li>
+</ol>
+<hr />
+<h3>3. Identifying Inconsistency &amp; Dependency</h3>
+<ul>
+<li>
+<p><strong>$0 = 0 \implies$ Dependent / Infinitely many solutions:</strong></p>
+<ul>
+<li>This occurs when the system represents a line.</li>
+<li><em>Example:</em> $2x + 3y = 6$ and $4x + 6y = 12$.</li>
+<li><em>Check:</em> $4x + 6y = 2(2x + 3y)$. Since $2x + 3y = 6$, then $4x + 6y = 12$. The system is dependent.</li>
+</ul>
+</li>
+<li>
+<p><strong>$0 = k \implies$ Inconsistent / No solution:</strong></p>
+<ul>
+<li>This occurs when the system represents a point (no solution).</li>
+<li><em>Example:</em> $2x + 3y = 6$ and $4x + 6y = 12$.</li>
+<li><em>Check:</em> $4x + 6y = 2(2x + 3y) = 2(6) = 12$. The system is inconsistent.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h3>4. Worked Example: Income-Expenditure Problem</h3>
+<p><strong>Given:</strong></p>
+<ol>
+<li>$9x - 4y = 2000$</li>
+<li>$7x - 3y = 2000$</li>
+</ol>
+<p><strong>Solution:</strong></p>
+<p><strong>Step 1: Multiply equations by non-zero constants to equalize coefficients.</strong>
+To eliminate $</p>
+<hr />
+<h2>Section 3.5: Master Formula Repository &amp; Consistency Decision Matrix</h2>
+<h1>Unit 3: Pair of Linear Equations in Two Variables</h1>
+<h2>Master Formula Repository &amp; Consistency Decision Matrix</h2>
+<h3>1. Master Decision Matrix</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Property</th>
+<th style="text-align:center">Ratio $\frac{a_1}{a_2}$</th>
+<th style="text-align:center">Ratio $\frac{b_1}{b_2}$</th>
+<th style="text-align:center">Ratio $\frac{c_1}{c_2}$</th>
+<th style="text-align:center">Algebraic Nature</th>
+<th style="text-align:center">Consistency</th>
+<th style="text-align:center">Determinant Interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Graphical</strong></td>
+<td style="text-align:center">Slope of line 1 ($m_1$)</td>
+<td style="text-align:center">Slope of line 2 ($m_2$)</td>
+<td style="text-align:center">Slope of line 1 ($m_1$)</td>
+<td style="text-align:center">$y = mx + c$</td>
+<td style="text-align:center">$m_1 = m_2$</td>
+<td style="text-align:center">$m_1 = m_2$</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Algebraic</strong></td>
+<td style="text-align:center">$y = mx + c$</td>
+<td style="text-align:center">$y = mx + c$</td>
+<td style="text-align:center">$y = mx + c$</td>
+<td style="text-align:center">$y = mx + c$</td>
+<td style="text-align:center">$c_1 = c_2$</td>
+<td style="text-align:center">$c_1 = c_2$</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Consistency</strong></td>
+<td style="text-align:center">$c_1 = c_2$</td>
+<td style="text-align:center">$c_1 = c_2$</td>
+<td style="text-align:center">$c_1 = c_2$</td>
+<td style="text-align:center">$c_1 = c_2$</td>
+<td style="text-align:center">$c_1 = c_2$</td>
+<td style="text-align:center">$c_1 = c_2$</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Determinant</strong></td>
+<td style="text-align:center">$\Delta_1 = 0$</td>
+<td style="text-align:center">$\Delta_2 = 0$</td>
+<td style="text-align:center">$\Delta_1 = 0$</td>
+<td style="text-align:center">$\Delta_1 = 0$</td>
+<td style="text-align:center">$\Delta_1 = \Delta_2$</td>
+<td style="text-align:center">$c_1 = c_2$</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3>2. Comparison: Substitution vs. Elimination</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Feature</th>
+<th style="text-align:left">Substitution Method</th>
+<th style="text-align:left">Elimination Method</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Computational Efficiency</strong></td>
+<td style="text-align:left"><strong>High.</strong> Requires solving one equation for one variable.</td>
+<td style="text-align:left"><strong>Low.</strong> Requires solving two equations for two variables.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Best Use Cases</strong></td>
+<td style="text-align:left">When one variable is already isolated or easy to isolate.</td>
+<td style="text-align:left">When both variables are isolated or when substitution leads to a complex system.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Risk of Error</strong></td>
+<td style="text-align:left">High. Requires careful substitution of values.</td>
+<td style="text-align:left">Low. Systematic application of rules.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Time Required</strong></td>
+<td style="text-align:left">Shorter per step.</td>
+<td style="text-align:left">Longer per step.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Verdict</strong></td>
+<td style="text-align:left">Preferred for simpler systems.</td>
+<td style="text-align:left">Preferred for complex systems requiring symmetry.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3>3. Standard Forms and Sign Conventions</h3>
+<p><strong>Rule:</strong> $c_1$ and $c_2$ must be on the <strong>Left Hand Side (LHS)</strong> of the equation.
+$$ \frac{a_1 x + b_1}{c_1} = \frac{a_2 x + b_2}{c_2} $$</p>
+<p><strong>Sign Convention:</strong></p>
+<ul>
+<li><strong>Positive $c$:</strong> $x$ is on the LHS.</li>
+<li><strong>Negative $c$:</strong> $x$ is on the RHS.</li>
+<li><strong>Zero $c$:</strong> $x$ is on the LHS (or RHS).</li>
+</ul>
+<p><strong>Example:</strong>
+$$ \frac{2x - 3}{1} = \frac{4x - 5}{2} $$</p>
+<ul>
+<li>$c_1 = 1$ (LHS)</li>
+<li>$c_2 = 2$ (LHS</li>
+</ul>
+<hr />
+<h2>Section 3.6: Step-by-Step Algorithmic Problem Solving Procedures</h2>
+<h1>Unit 3: Pair of Linear Equations in Two Variables</h1>
+<h2>Section 3.6: Step-by-Step Algorithmic Problem Solving Procedures</h2>
+<h3>1. Algorithm 1: Graphical Solution of a Linear Pair</h3>
+<p><strong>Objective:</strong> Find the coordinate table $(x, y)$ and the vertex intersection point.</p>
+<p><strong>Procedure:</strong></p>
+<ol>
+<li><strong>Formulate Equations:</strong> Write the two linear equations in the form $Ax + By = C$.</li>
+<li><strong>Solve for $x$ and $y$ (Coordinate Tables):</strong>
+<ul>
+<li>Isolate $x$ in one equation and $y$ in the other.</li>
+<li>Solve the system using substitution or elimination to find the exact coordinates $(x_1, y_1)$ and $(x_2, y_2)$.</li>
+</ul>
+</li>
+<li><strong>Plot the Lines:</strong>
+<ul>
+<li>Plot point $(x_1, y_1)$ on the $x$-axis.</li>
+<li>Plot point $(x_2, y_2)$ on the $y$-axis.</li>
+<li>Draw the full lines extending through these points.</li>
+</ul>
+</li>
+<li><strong>Find the Intersection:</strong>
+<ul>
+<li>Identify the point where the two lines cross. This is the vertex of the linear pair.</li>
+<li>Verify that the intersection point satisfies both original equations.</li>
+</ul>
+</li>
+</ol>
+<hr />
+<h3>2. Algorithm 2: Determining Consistency without Drawing Graphs (Ratio Tests)</h3>
+<p><strong>Objective:</strong> Determine if a system of equations represents a consistent, inconsistent, or inconsistent system.</p>
+<p><strong>Procedure:</strong></p>
+<ol>
+<li><strong>Formulate Equations:</strong> Write the two linear equations in the form $Ax + By = C$.</li>
+<li><strong>Calculate the Ratio of Coefficients:</strong>
+<ul>
+<li>Let $A_1 = A$ and $B_1 = B$.</li>
+<li>Let $A_2 = A$ and $B_2 = B$.</li>
+<li>Calculate the ratio $R = \frac{A_1}{A_2}$ and $S = \frac{B_1}{B_2}$.</li>
+</ul>
+</li>
+<li><strong>Apply Ratio Test:</strong>
+<ul>
+<li><strong>Case A (Consistent):</strong> If $R = S$, the system is <strong>consistent</strong>. The lines are parallel (or coincident).</li>
+<li><strong>Case B (Inconsistent):</strong> If $R \neq S$, the system is <strong>inconsistent</strong>. The lines are perpendicular (or coincident).</li>
+<li><strong>Case C (No Solution):</strong> If $R = S$ but $A_1 \neq A_2$ (or $B_1 \neq B_2$), the system is <strong>no solution</strong>.</li>
+</ul>
+</li>
+</ol>
+<hr />
+<h3>3. Algorithm 3: Solving Fractional / Decimal Linear Systems (LCM &amp; Powers of 10)</h3>
+<p><strong>Objective:</strong> Clear denominators and solve for $x$ and $y$ using standard arithmetic.</p>
+<p><strong>Procedure:</strong></p>
+<ol>
+<li><strong>Identify Fractions:</strong> Check if the system contains fractions. If so, identify the Least Common Multiple (LCM) of the denominators.</li>
+<li><strong>Clear Denominators:</strong> Multiply every term in both equations by the LCM to eliminate fractions.
+<ul>
+<li><em>Note:</em> If the LCM is not an integer, multiply by the reciprocal of the LCM.</li>
+</ul>
+</li>
+<li><strong>Solve for $x$ and $y$:</strong>
+<ul>
+<li>Rearrange the system to isolate $x$ and $y$.</li>
+<li>Solve the resulting linear system</li>
+</ul>
+</li>
+</ol>
+<hr />
+<h2>Section 3.7: Foundational &amp; Concept-Building Worked Examples</h2>
+<h1>Unit 3: Pair of Linear Equations in Two Variables</h1>
+<h2>Section 3.7: Foundational &amp; Concept-Building Worked Examples</h2>
+<h3><strong>Task 1: Graphical Consistency and Solution</strong></h3>
+<p><strong>Equations:</strong></p>
+<ol>
+<li>$x + 3y = 6$</li>
+<li>$2x - 3y = 12$</li>
+</ol>
+<p><strong>Analysis:</strong></p>
+<ul>
+<li>Slope of Eq 1: $m_1 = -3$</li>
+<li>Slope of Eq 2: $m_2 = 2$</li>
+<li>Since $m_1 \neq m_2$, the lines are <strong>parallel</strong>.</li>
+<li><strong>Check:</strong> Substitute $x = 6 - 3y$ into Eq 2:
+$2(6 - 3y) - 3y = 12 \implies 12 - 6y - 3y = 12 \implies -9y = 0 \implies y = 0$.
+If $y=0$, $x=6$.</li>
+<li><strong>Solution:</strong> $(6, 0)$.</li>
+<li><strong>Conclusion:</strong> The system is <strong>consistent</strong>.</li>
+</ul>
+<hr />
+<h3><strong>Task 2: Substitution Method</strong></h3>
+<p><strong>Equations:</strong></p>
+<ol>
+<li>$\sqrt{2}x + \sqrt{3}y = 0$</li>
+<li>$\sqrt{3}x - \sqrt{8}y = 0$</li>
+</ol>
+<p><strong>Step 1: Simplify Coefficients</strong></p>
+<ul>
+<li>Eq 1: $\sqrt{2}x + \sqrt{3}y = 0$</li>
+<li>Eq 2: $\sqrt{3}x - 2\sqrt{2}y = 0$ (Note: $\sqrt{8} = \sqrt{4 \times 2} = 2\sqrt{2}$)</li>
+</ul>
+<p><strong>Step 2: Eliminate $x$</strong>
+Multiply Eq 1 by $\sqrt{3}$ and Eq 2 by $\sqrt{2}$:</p>
+<ul>
+<li>$m_1 \cdot \text{Eq 1} \implies \sqrt{2} \cdot \sqrt{3}x + \sqrt{2} \cdot \sqrt{3}y = 0 \implies \sqrt{6}x + \sqrt{6}y = 0$</li>
+<li>$m_2 \cdot \text{Eq 2} \implies \sqrt{3} \cdot \sqrt{3}x - \sqrt{3} \cdot 2\sqrt{2}y = 0 \implies 3x - 2\sqrt{6}y = 0$</li>
+</ul>
+<p><strong>Step 3: Solve for $y$</strong>
+From Eq 1: $\sqrt{6}y = -\sqrt{6}x \implies y = -\sqrt{6}x / \sqrt{6} = -x$.
+Substitute $y = -x$ into Eq 2:
+$3x - 2\sqrt{6}(-x) = 0 \implies 3x + 2\sqrt{6}x = 0 \implies x(3 + 2\sqrt{6}) = 0$.
+Since $3 + 2\sqrt{6} \neq 0$, $x = 0$.
+Then $y = -0 = 0$.
+<strong>Solution:</strong> $(0, 0)$.</p>
+<hr />
+<h3><strong>Task 3: Elimination Method</strong></h3>
+<p><strong>Equations:</strong></p>
+<hr />
+<h2>Section 3.8: Word Problems &amp; Real-World Mathematical Modeling (HOTS)</h2>
+<h1>Unit 3: Pair of Linear Equations in Two Variables</h1>
+<h2>Section 3.8: Word Problems &amp; Real-World Mathematical Modeling (HOTS)</h2>
+<h3><strong>Task Instructions</strong></h3>
+<p>Generate comprehensive, structured solutions for the 5 classic types of word problems in Unit 3:</p>
+<ol>
+<li><strong>Category 1</strong>: Sum of a two-digit number and its reversal is 66; digits differ by 2. Find the number.</li>
+<li><strong>Category 2</strong>: Five years hence, Jacob's age will be 3 times his son; 5 years ago, Jacob was 7 times his son. Find present ages.</li>
+<li><strong>Category 3</strong>: A fraction becomes $9/11$ if 2 is added to numerator and denominator; becomes $5/6$ if 3 is added to both. Find the fraction.</li>
+<li><strong>Category 4</strong>: Taxi charges: 10 km costs Rs 105, 15 km costs Rs 155. Find fixed charge and rate per km; calculate cost for 25 km.</li>
+<li><strong>Category 5</strong>: Meena withdraws Rs 2000, receives 25 notes in total of Rs 50 and Rs 100. Find the number of each note.</li>
+</ol>
+<hr />
+<h3><strong>1. Category 1: Two-Digit Number Problem</strong></h3>
+<p><strong>Problem Statement:</strong>
+Sum of a two-digit number and its reversal is 66; digits differ by 2. Find the number.</p>
+<p><strong>Solution:</strong>
+Let the two-digit number be $x$.
+The digits of $x$ are $d_1$ and $d_2$, where $10d_1 + d_2 = x$.
+The reversal of $x$ is $10d_2 + d_1$.
+The given condition is:
+$$ (10d_1 + d_2) + (10d_2 + d_1) = 66 $$
+$$ 11(d_1 + d_2) = 66 $$
+$$ d_1 + d_2 = 6 $$
+Since $x$ is a two-digit number, $10 \le x \le 99$.
+Also, the digits differ by 2: $|d_1 - d_2| = 2$.
+Possible pairs $(d_1, d_2)$ satisfying $d_1 + d_2 = 6$ and $|d_1 - d_2| = 2$:</p>
+<ol>
+<li>$(3, 3)$: $3+3=6$, $|3-3|=0 \neq 2$ (Invalid)</li>
+<li>$(4, 2)$: $4+2=6$, $|4-2|=2$ (Valid)</li>
+<li>$(2, 4)$: $2+4=6$, $|2-4|=2$ (Valid)</li>
+<li>$(5, 1)$: $5+1=6$, $|5-1|=4 \neq 2$ (Invalid)</li>
+</ol>
+<p>Let $x$ be the number.
+If $d_1 = 4, d_2 = 2$, then $x = 42$.
+If $d_1 = 2, d_2 = 4$, then $x = 24$.</p>
+<p><strong>Answer:</strong>
+The number is either <strong>42</strong> or <strong>24</strong>.</p>
+<hr />
+<h3>**</h3>
+<hr />
+<h2>Section 3.9: Common Misconceptions, Degenerate Cases &amp; Exam Traps</h2>
+<h1>Unit 3: Pair of Linear Equations in Two Variables</h1>
+<h2>Section 3.9: Common Misconceptions, Degenerate Cases &amp; Exam Traps</h2>
+<h3>1. Trap 1: Inconsistent Constant Placement ($c_1$ on LHS while $c_2$ on RHS)</h3>
+<p><strong>Misconception:</strong> Students incorrectly place $c_1$ on the left-hand side (LHS) and $c_2$ on the right-hand side (RHS) of the equation, leading to a flipped ratio test $\frac{c_1}{c_2}$.
+<strong>Correct Step:</strong>
+$$
+\begin{aligned}
+c_1 x + c_1 y &amp;= c_1 \
+c_2 x + c_2 y &amp;= c_2 \
+\frac{c_1 x + c_1 y}{c_2 x + c_2 y} &amp;= \frac{c_1}{c_2}
+\end{aligned}
+$$
+<strong>Why it fails:</strong> The ratio $\frac{c_1}{c_2}$ is valid only when $c_1 \neq 0$ and $c_2 \neq 0$. If $c_1 = 0$ and $c_2 \neq 0$, the LHS is $0$ and the RHS is $c_2$, so the ratio is undefined. This causes the student to conclude the system is inconsistent.
+<strong>Exam Trap:</strong> Students memorize $\frac{c_1}{c_2}$ blindly without checking if the numerator is zero.
+<strong>Correct Step:</strong>
+$$
+\begin{aligned}
+c_1 x + c_1 y &amp;= c_1 \
+c_2 x + c_2 y &amp;= c_2 \
+\frac{c_1 x + c_1 y}{c_2 x + c_2 y} &amp;= \frac{c_1}{c_2} \quad \text{if } c_1 \neq 0, c_2 \neq 0
+\end{aligned}
+$$
+<strong>Common Trap:</strong> $c_1 = 0$ and $c_2 \neq 0 \implies \frac{0}{c_2} = 0 \neq \frac{c_1}{c_2} = 0$.</p>
+<hr />
+<h3>2. Trap 2: Sign Errors during Subtraction in the Elimination Method</h3>
+<p><strong>Misconception:</strong> Failing to distribute the minus sign across all terms when subtracting $c_2 x$ from $c_1 x$.
+<strong>Correct Step:</strong>
+$$
+\begin{aligned}
+c_1 x + c_1 y &amp;= c_1 \
+c_2 x + c_2 y &amp;= c_2 \
+\text{Subtracting } c_2 x \text{ from } c_1 x: \quad c_1 x - c_2 x &amp;= c_1 - c_2 \
+\text{Subtracting } c_2 y \text{ from } c_1 y: \quad c_1 y - c_2 y &amp;= c_1 - c_2
+\end{aligned}
+$$
+<strong>Why it fails:</strong> Students forget that $-c_2 x$ becomes $-(c_2 x)$ and $-c_2 y$ becomes $-(c_2 y)$.
+<strong>Exam Trap:</strong> Students write $c_1 x - c_2 x$ instead of</p>
+<hr />
+<h2>Section 3.10: NCERT Exercise Walkthrough, Summary Checklist &amp; Practice Drill</h2>
+<h1>Unit 3: Pair of Linear Equations in Two Variables</h1>
+<h2>Section 3.10: NCERT Exercise Walkthrough, Summary Checklist &amp; Practice Drill</h2>
+<h3>1. Comprehensive Breakdown of NCERT Exercises 3.1, 3.2, and 3.3</h3>
+<p><strong>Exercise 3.1: Solving Systems of Linear Equations</strong></p>
+<ul>
+<li><strong>Problem:</strong> Solve the system:
+$$ \begin{cases} x + y = 5 \ 2x - y = 1 \end{cases} $$</li>
+<li><strong>Method:</strong> Elimination (Substitution).
+<ul>
+<li>Add the two equations: $(x+y) + (2x-y) = 5+1 \Rightarrow 3x = 6 \Rightarrow x = 2$.</li>
+<li>Substitute $x=2$ into the first equation: $2+y=5 \Rightarrow y=3$.</li>
+<li><strong>Solution:</strong> $(2, 3)$.</li>
+</ul>
+</li>
+<li><strong>Key Concept:</strong> The system has a unique solution.</li>
+</ul>
+<p><strong>Exercise 3.2: Solving Systems of Linear Equations (General Method)</strong></p>
+<ul>
+<li><strong>Problem:</strong> Solve the system:
+$$ \begin{cases} 3x + 2y = 12 \ 2x - y = 4 \end{cases} $$</li>
+<li><strong>Method:</strong> Elimination.
+<ul>
+<li>Multiply the second equation by 2: $4x - 2y = 8$.</li>
+<li>Add to the first equation: $(3x+2y) + (4x-2y) = 12+8 \Rightarrow 7x = 20 \Rightarrow x = \frac{20}{7}$.</li>
+<li>Substitute $x$ into the first equation: $3(\frac{20}{7}) + 2y = 12 \Rightarrow \frac{60}{7} + 2y = \frac{84}{7} \Rightarrow 2y = \frac{24}{7} \Rightarrow y = \frac{12}{7}$.</li>
+<li><strong>Solution:</strong> $(\frac{20}{7}, \frac{12}{7})$.</li>
+</ul>
+</li>
+<li><strong>Key Concept:</strong> Determinant of the coefficient matrix $\Delta = b_1a_2 - b_2a_1$. If $\Delta \neq 0$, unique solution exists.</li>
+</ul>
+<p><strong>Exercise 3.3: Solving Systems of Linear Equations (HOTS)</strong></p>
+<ul>
+<li><strong>Problem:</strong> Solve the system:
+$$ \begin{cases} 3x + 2y = 12 \ 2x - y = 4 \end{cases} $$
+<ul>
+<li><em>Note: This is the same system as Exercise 3.2.</em></li>
+</ul>
+</li>
+<li><strong>Method:</strong> Elimination.
+<ul>
+<li>As calculated above, $x = \frac{20}{7}$ and $y = \frac{12}{7}$.</li>
+</ul>
+</li>
+<li><strong>Key Concept:</strong> HOTS requires identifying the system type and applying the appropriate elimination technique.</li>
+</ul>
+<hr />
+<h3>2. Rapid-Fire Revision Checklist (10 Bullet Points)</h3>
+<ol>
+<li><strong>Identify the System Type:</strong> Is it a system of 2 linear equations in 2 variables? (Yes/No).</li>
+<li><strong>Check for Consistency:</strong> Does the system have a unique solution, no solution, or infinitely many solutions? (Use $\Delta$ test).</li>
+<li>**Apply Elimination</li>
+</ol>
+
+  </div>
+</body>
+</html>

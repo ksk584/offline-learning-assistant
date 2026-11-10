@@ -37,6 +37,9 @@ def default_data_dir() -> Path:
 
 
 def default_llm_dir() -> Path:
+    local_dir = Path("models") / "llm"
+    if local_dir.is_dir() and any(local_dir.glob("*.gguf")):
+        return local_dir.resolve()
     return default_model_dir() / "llm"
 
 
@@ -126,6 +129,15 @@ class LlmSettings(BaseModel):
     min_model_bytes: int = 20_000_000
 
 
+class CurriculumSettings(BaseModel):
+    """Default NCERT course used when a request does not name one explicitly."""
+
+    class_level: int = Field(default=10, ge=8, le=10)
+    subject: Literal["science", "maths"] = "science"
+    #: Match chapters from the transcript and steer the notes prompt.
+    auto_match: bool = True
+
+
 class ServerSettings(BaseModel):
     host: str = "127.0.0.1"
     port: int = 8765
@@ -145,6 +157,7 @@ class Settings(BaseSettings):
     partials: PartialSettings = Field(default_factory=PartialSettings)
     asr: AsrSettings = Field(default_factory=AsrSettings)
     llm: LlmSettings = Field(default_factory=LlmSettings)
+    curriculum: CurriculumSettings = Field(default_factory=CurriculumSettings)
     server: ServerSettings = Field(default_factory=ServerSettings)
     #: Where transcripts / JSONL event logs are written by default.
     data_dir: Path = Field(default_factory=default_data_dir)

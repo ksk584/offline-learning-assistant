@@ -27,12 +27,15 @@ import time
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ila.config import LlmSettings
 from ila.events import CaptionEvent
 from ila.llm import LlmProvider, create_llm
 from ila.text import normalize_transcript
+
+if TYPE_CHECKING:  # pragma: no cover
+    from ila.curriculum import SyllabusContext
 
 logger = logging.getLogger(__name__)
 
@@ -353,6 +356,8 @@ class NoteResult:
     latency_s: float = 0.0
     fallback_reason: str | None = None
     sentences: int = 0
+    #: Serialized :class:`ila.curriculum.SyllabusContext`, when requested.
+    curriculum: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -368,6 +373,7 @@ class NoteResult:
             "latency_s": round(self.latency_s, 2),
             "fallback_reason": self.fallback_reason,
             "sentences": self.sentences,
+            "curriculum": self.curriculum,
         }
 
     def to_markdown(self) -> str:
@@ -382,6 +388,16 @@ class NoteResult:
             lines += ["## Terms", ""]
             for item in self.definitions:
                 lines.append(f"- **{item.term}** - {item.text}")
+            lines.append("")
+        if self.curriculum and self.curriculum.get("matches"):
+            lines += ["## Syllabus alignment", ""]
+            course = str(self.curriculum.get("course", "NCERT"))
+            for match in self.curriculum["matches"]:
+                terms = ", ".join(match.get("matched_terms", [])[:6])
+                suffix = f" - matched: {terms}" if terms else ""
+                lines.append(
+                    f"- **{course}** - Chapter {match['number']}: {match['title']}{suffix}"
+                )
             lines.append("")
         if self.keywords:
             lines += ["## Keywords", "", ", ".join(f"`{word}`" for word in self.keywords), ""]
@@ -420,6 +436,13 @@ SYSTEM_PROMPT = (
     "excerpt does not support a point, leave it out. Write plain text in the "
     "same language as the excerpt."
 )
+
+
+def build_system_prompt(syllabus: SyllabusContext | None = None) -> str:
+    """Keep the grounding rules and append only a terminology-level syllabus hint."""
+    if syllabus is None:
+        return SYSTEM_PROMPT
+    return f"{SYSTEM_PROMPT}\n\n{syllabus.prompt()}"
 
 BLOCK_PROMPT = """Transcript excerpt:
 {excerpt}
@@ -582,7 +605,11 @@ class NotesGenerator:
 
     # ------------------------------------------------------------------ public
     def generate(
-        self, lines: Sequence[TranscriptLine], *, title: str = "Lecture notes"
+        self,
+        lines: Sequence[TranscriptLine],
+        *,
+        title: str = "Lecture notes",
+        syllabus: SyllabusContext | None = None,
     ) -> NoteResult:
         started = time.perf_counter()
         sentences = split_sentences(lines)
@@ -594,6 +621,7 @@ class NotesGenerator:
         selected = select_sentences(sentences, limit=desired_sentence_count(len(sentences)))
         keywords = extract_keywords(selected)
         definitions = find_definitions(selected)
+        system_prompt = build_system_prompt(syllabus)
 
         points = [NotePoint(text=s.text, start=s.start) for s in selected]
         summary = _extractive_summary(selected, keywords)
@@ -608,13 +636,16 @@ class NotesGenerator:
         else:
             deadline = started + self.settings.budget_s
             llm_points, summaries, llm_terms, dropped, fallback = self._rewrite(
-                selected, evidence, deadline
+                selected, evidence, deadline, system_prompt
             )
             if llm_points:
                 used_llm = True
                 points = llm_points
                 definitions = _dedupe_definitions(llm_terms + definitions)[:6]
-                summary = self._merge_summaries(summaries, evidence, deadline) or summary
+                summary = (
+                    self._merge_summaries(summaries, evidence, deadline, system_prompt)
+                    or summary
+                )
 
         return NoteResult(
             title=title,
@@ -629,6 +660,7 @@ class NotesGenerator:
             latency_s=time.perf_counter() - started,
             fallback_reason=fallback,
             sentences=len(sentences),
+            curriculum=syllabus.to_dict() if syllabus is not None else None,
         )
 
     # ----------------------------------------------------------------- private
@@ -644,6 +676,7 @@ class NotesGenerator:
         selected: Sequence[Sentence],
         evidence: set[str],
         deadline: float,
+        system_prompt: str,
     ) -> tuple[list[NotePoint], list[str], list[Definition], int, str | None]:
         chunks = _chunk(selected, self.settings.chunk_chars)
         points: list[NotePoint] = []
@@ -664,7 +697,7 @@ class NotesGenerator:
             try:
                 raw = self.llm.complete(
                     [
-                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": BLOCK_PROMPT.format(excerpt=excerpt)},
                     ],
                     max_tokens=self.settings.max_tokens,
@@ -717,7 +750,11 @@ class NotesGenerator:
         return _dedupe_points(points), summaries, definitions, dropped, reason
 
     def _merge_summaries(
-        self, summaries: Sequence[str], evidence: set[str], deadline: float
+        self,
+        summaries: Sequence[str],
+        evidence: set[str],
+        deadline: float,
+        system_prompt: str,
     ) -> str | None:
         if not summaries:
             return None
@@ -727,7 +764,7 @@ class NotesGenerator:
             try:
                 raw = self.llm.complete(
                     [
-                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": REDUCE_PROMPT.format(
                             summaries="\n".join(f"- {item}" for item in summaries)
                         )},
@@ -773,6 +810,20 @@ def generate_notes(
     *,
     title: str = "Lecture notes",
     profile: str | None = None,
+    class_level: int | None = None,
+    subject: str | None = None,
 ) -> NoteResult:
-    """Convenience wrapper: build the configured provider and generate notes."""
-    return NotesGenerator.from_settings(settings, profile=profile).generate(lines, title=title)
+    """Convenience wrapper: build the configured provider and generate notes.
+
+    When ``class_level`` and ``subject`` are given, the transcript is matched to
+    the NCERT course and the resulting chapter hint is added to the prompt.
+    """
+    syllabus = None
+    if class_level is not None and subject is not None:
+        from ila.curriculum import build_syllabus_context
+
+        text = " ".join(line.text for line in lines)
+        syllabus = build_syllabus_context(text, class_level, subject)
+    return NotesGenerator.from_settings(settings, profile=profile).generate(
+        lines, title=title, syllabus=syllabus
+    )

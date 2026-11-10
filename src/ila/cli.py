@@ -183,6 +183,18 @@ def transcribe(
         Path | None,
         typer.Option("--notes-out", help="Also generate grounded Markdown notes"),
     ] = None,
+    class_level: Annotated[
+        int | None,
+        typer.Option("--class-level", "-c", help="NCERT class for syllabus alignment (8, 9, 10)"),
+    ] = None,
+    subject: Annotated[
+        str | None,
+        typer.Option("--subject", "-s", help="NCERT subject: science or maths"),
+    ] = None,
+    no_syllabus: Annotated[
+        bool,
+        typer.Option("--no-syllabus", help="Disable NCERT chapter matching for the notes"),
+    ] = False,
     realtime: Annotated[
         bool, typer.Option("--realtime", help="Pace playback at real time")
     ] = False,
@@ -211,7 +223,17 @@ def transcribe(
         text_out.write_text(summary.transcript + "\n", encoding="utf-8")
         console.print(f"[green]transcript[/green] {text_out}")
     if notes_out:
-        _write_notes(summary.events, settings, notes_out, title=path.stem)
+        level, subject_name = _syllabus_selection(
+            settings, class_level, subject, no_syllabus
+        )
+        _write_notes(
+            summary.events,
+            settings,
+            notes_out,
+            title=path.stem,
+            class_level=level,
+            subject=subject_name,
+        )
     _print_summary(summary, settings)
 
 
@@ -233,12 +255,38 @@ def _write_jsonl(path: Path, events: list[CaptionEvent]) -> None:
             handle.write(json.dumps(event.to_dict(), ensure_ascii=False) + "\n")
 
 
+def _syllabus_selection(
+    settings: Settings,
+    class_level: int | None,
+    subject: str | None,
+    disabled: bool,
+) -> tuple[int | None, str | None]:
+    if disabled:
+        return None, None
+    return (
+        class_level or settings.curriculum.class_level,
+        subject or settings.curriculum.subject,
+    )
+
+
 def _write_notes(
-    events: list[CaptionEvent], settings: Settings, path: Path, *, title: str
+    events: list[CaptionEvent],
+    settings: Settings,
+    path: Path,
+    *,
+    title: str,
+    class_level: int | None = None,
+    subject: str | None = None,
 ) -> None:
     from ila.notes import lines_from_events
 
-    result = generate_notes(lines_from_events(events), settings.llm, title=title)
+    result = generate_notes(
+        lines_from_events(events),
+        settings.llm,
+        title=title,
+        class_level=class_level,
+        subject=subject,
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(result.to_markdown(), encoding="utf-8")
     engine = result.model if result.used_llm else "extractive"
@@ -306,6 +354,18 @@ def notes(
     no_llm: Annotated[
         bool, typer.Option("--no-llm", help="Extractive notes only (no model load)")
     ] = False,
+    class_level: Annotated[
+        int | None,
+        typer.Option("--class-level", "-c", help="NCERT class for syllabus alignment (8, 9, 10)"),
+    ] = None,
+    subject: Annotated[
+        str | None,
+        typer.Option("--subject", "-s", help="NCERT subject: science or maths"),
+    ] = None,
+    no_syllabus: Annotated[
+        bool,
+        typer.Option("--no-syllabus", help="Disable NCERT chapter matching"),
+    ] = False,
     budget_s: Annotated[
         float | None, typer.Option("--budget-s", help="Wall-clock budget for model calls")
     ] = None,
@@ -330,11 +390,19 @@ def notes(
         f"[dim]transcript[/dim] {len(lines)} lines "
         f"[dim]profile[/dim] {'extractive' if no_llm else profile}"
     )
+    level, subject_name = _syllabus_selection(settings, class_level, subject, no_syllabus)
+    if level is not None and subject_name is not None:
+        console.print(
+            f"[dim]syllabus[/dim] NCERT Class {level} {subject_name.title()} "
+            "[dim](chapter matching enabled)[/dim]"
+        )
     result = generate_notes(
         lines,
         settings.llm,
         title=title or _default_title(path),
         profile=None if profile == "auto" else profile,
+        class_level=level,
+        subject=subject_name,
     )
 
     target = out or path.with_suffix(".notes.md")
@@ -420,6 +488,37 @@ def doctor() -> None:
             "[yellow]Extractive only:[/yellow] captions and TextRank notes still work; "
             "run `ila download-llm` for abstractive notes."
         )
+
+
+@app.command()
+def syllabus(
+    class_level: Annotated[
+        int, typer.Option("--class-level", "-c", help="NCERT class (8, 9, 10)")
+    ] = 10,
+    subject: Annotated[
+        str, typer.Option("--subject", "-s", help="science or maths")
+    ] = "science",
+) -> None:
+    """List the NCERT chapters used for syllabus alignment."""
+    from ila.curriculum import get_course
+
+    try:
+        course = get_course(class_level, subject)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    table = Table(title=f"{course.label} - NCERT chapters", show_lines=False)
+    table.add_column("#", justify="right")
+    table.add_column("Chapter")
+    table.add_column("Key terms")
+    for chapter in course.chapters:
+        terms = ", ".join(chapter.keywords[:5]) or "-"
+        table.add_row(str(chapter.number), chapter.title, terms)
+    console.print(table)
+    console.print(
+        f"[dim]{len(course.chapters)} chapters. `ila notes` and the dashboard use "
+        "this map for chapter matching.[/dim]"
+    )
 
 
 @app.command()
