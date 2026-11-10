@@ -17,7 +17,25 @@ mic / file ──▶ adaptive VAD ──▶ utterance segmenter ──▶ faster
                                               (.md)     (Qwen3.5 GGUF, CPU)     (extractive)
 ```
 
-## Quick start (Windows, ~5 minutes after the model download)
+## One-Click Setup & Run (Windows)
+
+Simply double-click or run:
+
+```cmd
+install-run.bat
+```
+
+This automated script will:
+1. Detect or configure your Python 3.11+ environment.
+2. Install dependencies with `uv` in seconds.
+3. Automatically download the local offline LLM model (~532 MB) if missing.
+4. Launch the local FastAPI server and open your browser to `http://127.0.0.1:8765`.
+
+*(PowerShell users can alternatively run `.\install-run.ps1`)*
+
+---
+
+## Manual Quick Start (Windows)
 
 ```powershell
 uv venv --python 3.11
