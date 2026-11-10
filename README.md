@@ -32,11 +32,27 @@ Transcribe a recorded lecture (wav / mp3 / mp4 — anything PyAV can decode):
 ila transcribe .\lecture.mp3 --out .\lecture.events.jsonl --text-out .\lecture.txt
 ```
 
+No microphone at hand? Generate a spoken fixture with the Windows speech synthesizer:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\make_test_audio.ps1
+ila transcribe tests\fixtures\sample_lecture.wav
+```
+
 Serve the local API for the future dashboard:
 
 ```powershell
 ila serve            # http://127.0.0.1:8765  (WebSocket: /ws/captions)
 ```
+
+### Troubleshooting
+
+* **`Library cublas64_12.dll is not found`** — a CUDA GPU was detected but the CUDA 12 runtime is
+  incomplete. ILA verifies the GPU with a short probe and automatically falls back to CPU. Install
+  the CUDA 12 libraries or set `ILA_ASR__DEVICE=cpu` to skip the probe.
+* **First run is slow** — the Whisper weights are downloaded once into `ILA_HOME/models`.
+* **Captions never appear** — run `ila calibrate`; if your speech is less than ~8 dB above the
+  measured noise floor, lower `ILA_VAD__START_MARGIN_DB`.
 
 ## What is already solid
 
