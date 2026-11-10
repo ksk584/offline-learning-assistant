@@ -4,13 +4,17 @@ On-device lecture assistant for **SDG 4 (Quality Education)** — no cloud, no A
 after setup. Phase 1 (this repo, today) is the **captioning pipeline**: capture audio, find speech
 boundaries, transcribe locally with Whisper, and stream caption events.
 
-Planned phases build on the same event stream: structured notes (TextRank), syllabus-aware Q&A
-(MiniLM + FAISS), adaptive quizzes (scikit-learn), all shown in a React teacher dashboard.
+Planned phases build on the same event stream: structured notes (TextRank + a small local
+LLM), syllabus-aware Q&A (MiniLM + FAISS), adaptive quizzes (scikit-learn), all shown in a React
+teacher dashboard.
 
 ```text
 mic / file ──▶ adaptive VAD ──▶ utterance segmenter ──▶ faster-whisper (local) ──▶ caption events
                 (noise floor)     (roll padding,          (int8 CPU by default)     final / partial
                                    forced splits)                                   + JSONL / WebSocket
+                                                                                            │
+                                              notes ──▶ grounded local LLM ◀── TextRank ◀──┘
+                                              (.md)     (Qwen3.5 GGUF, CPU)     (extractive)
 ```
 
 ## Quick start (Windows, ~5 minutes after the model download)
@@ -18,18 +22,43 @@ mic / file ──▶ adaptive VAD ──▶ utterance segmenter ──▶ faster
 ```powershell
 uv venv --python 3.11
 .\.venv\Scripts\Activate.ps1
-uv pip install -e ".[dev]"
+uv pip install -e ".[dev,llm]"
 
-# one-time model download (~145 MB for base.en), then everything runs offline
-ila download-model base.en
+# one-time model downloads, then everything runs offline
+ila download-model base.en     # ~145 MB captioning model
+ila download-llm                # ~1.3 GB notes model (balanced profile)
+
 ila devices          # find your microphone index
 ila live             # live captions in the terminal
 ```
 
-Transcribe a recorded lecture (wav / mp3 / mp4 — anything PyAV can decode):
+> `llama-cpp-python` has no PyPI wheel for every platform. If the install falls back to a source
+> build (CMake/MSVC errors), use the project's CPU wheel index:
+>
+> ```powershell
+> uv pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu --only-binary llama-cpp-python
+> ```
+>
+> Without it, captions and extractive notes still work; only abstractive rewriting is disabled.
+
+Transcribe a recorded lecture and generate notes in one pass:
 
 ```powershell
-ila transcribe .\lecture.mp3 --out .\lecture.events.jsonl --text-out .\lecture.txt
+ila transcribe .\lecture.mp3 --out .\lecture.events.jsonl --text-out .\lecture.txt --notes-out .\lecture.notes.md
+```
+
+Or generate notes from an existing transcript at any time:
+
+```powershell
+ila notes .\lecture.events.jsonl --out .\lecture.notes.md   # timestamps preserved
+ila notes .\lecture.txt --profile potato                    # smallest model
+ila notes .\lecture.txt --no-llm                            # extractive only, no model load
+```
+
+Check what this machine can run before a demo:
+
+```powershell
+ila doctor
 ```
 
 No microphone at hand? Generate a spoken fixture with the Windows speech synthesizer:
@@ -53,6 +82,10 @@ ila serve            # http://127.0.0.1:8765  (WebSocket: /ws/captions)
 * **First run is slow** — the Whisper weights are downloaded once into `ILA_HOME/models`.
 * **Captions never appear** — run `ila calibrate`; if your speech is less than ~8 dB above the
   measured noise floor, lower `ILA_VAD__START_MARGIN_DB`.
+* **Notes are plain transcript sentences** — the notes model is missing or disabled. Run
+  `ila doctor`, then `ila download-llm`; or accept the extractive fallback with `--no-llm`.
+* **Note generation is very slow** — use `--profile potato`, lower `ILA_LLM__N_THREADS`, or reduce
+  `ILA_LLM__BUDGET_S`; the pipeline falls back to extractive notes when the budget runs out.
 
 ## What is already solid
 
@@ -66,6 +99,30 @@ ila serve            # http://127.0.0.1:8765  (WebSocket: /ws/captions)
 | Testability | Segmenter and pipeline are hardware-free and covered by unit tests with synthetic audio |
 | Offline deployment | Models live under `ILA_HOME`; set `ILA_ASR__LOCAL_FILES_ONLY=true` to forbid network access |
 
+## Notes generation
+
+Notes are **extractive-first**. TextRank picks the sentences that carry the lecture; only those
+sentences are sent to the local model, in chunks that fit a 4k context. The model rewrites them into
+a summary, key points and definitions, and every generated line is checked against the transcript:
+unsupported lines are dropped and counted. If no model is installed, the runtime is missing, or the
+time budget runs out, the selected sentences are returned verbatim with timestamps.
+
+| Profile | Picked when | Model | Download | RAM |
+| --- | --- | --- | --- | --- |
+| `potato` | < 6.5 GB RAM or < 4 threads | Qwen3.5-0.8B Q4_K_M | ~0.53 GB | ~1.3 GB |
+| `balanced` | 8–16 GB RAM (default) | Qwen3.5-2B Q4_K_M | ~1.28 GB | ~2.2 GB |
+| `full` | 16 GB+ RAM and 8+ threads | Qwen3.5-4B Q4_K_M | ~2.74 GB | ~3.5 GB |
+
+`ila doctor` detects the machine and reports the chosen profile. Override it with
+`ila notes --profile potato` or `ILA_LLM__PROFILE=potato`. A hard time budget
+(`ILA_LLM__BUDGET_S`, 90 s by default) limits the total cost per lecture; slower machines fall back
+rather than making the user wait. The model file is a single GGUF under `ILA_HOME/models/llm`, and
+nothing contacts the network at runtime.
+
+Measured on the dev laptop with threads constrained to emulate a small machine: the 0.8B model with
+2 threads generates at ~30 tok/s and peaks under 1 GB RSS; the 2B model with 5 threads reaches
+~21 tok/s at ~2 GB. Both fit the "potato PC" target with room for Whisper alongside.
+
 ## Performance tuning
 
 `int8` `base.en` on a modern laptop CPU transcribes at roughly **2–6× realtime** with beam size 5,
@@ -77,6 +134,10 @@ $env:ILA_ASR__COMPUTE_TYPE = "int8"
 $env:ILA_ASR__BEAM_SIZE = "1"                        # fastest, slightly less accurate
 $env:ILA_VAD__MIN_SILENCE_MS = "600"                 # fewer, longer captions
 ila transcribe .\lecture.mp3 --no-partials           # batch mode: finals only
+$env:ILA_LLM__PROFILE = "potato"                       # smallest notes model
+$env:ILA_LLM__N_THREADS = "3"                          # leave a core for audio
+$env:ILA_LLM__BUDGET_S = "45"                          # cap note generation time
+$env:ILA_LLM__N_CTX = "2048"                           # less RAM on very small machines
 ```
 
 Run `ila calibrate` in the room you will record in; it reports the measured noise floor and the
@@ -97,6 +158,12 @@ Every setting is an environment variable (or `.env` entry) using `__` for nested
 | `ILA_VAD__MIN_SILENCE_MS` | `450` | Silence needed to end a caption |
 | `ILA_VAD__MAX_SEGMENT_S` | `20` | Hard cap before a quiet-point split |
 | `ILA_PARTIALS__ENABLED` | `true` | Live preview captions |
+| `ILA_LLM__ENABLED` | `true` | Set `false` for extractive-only notes |
+| `ILA_LLM__PROFILE` | `auto` | `potato`, `balanced`, `full`, or `auto` (hardware detection) |
+| `ILA_LLM__MODEL_PATH` | unset | Explicit GGUF file, overrides the profile |
+| `ILA_LLM__BUDGET_S` | `90` | Wall-clock budget for all model calls per lecture |
+| `ILA_LLM__N_CTX` | `4096` | Context window; lower saves RAM |
+| `ILA_LLM__N_THREADS` | `0` | `0` = physical cores minus one |
 | `ILA_AUDIO__DEVICE` | system default | Microphone index from `ila devices` |
 | `ILA_HOME` | `~/.ila` | Model and data directory |
 
@@ -128,8 +195,11 @@ src/ila/
   pipeline.py     source -> segmenter -> ASR -> CaptionEvent stream
   events.py       event + session-summary contract shared with the dashboard
   server.py       FastAPI + WebSocket transport
-  cli.py          live / transcribe / serve / devices / models / calibrate
-tests/            segmentation and pipeline tests with synthetic speech-like audio
+  hardware.py     RAM/CPU detection and profile thresholds (no psutil)
+  notes.py        TextRank extraction, grounded LLM prompting, verification, Markdown
+  llm/            provider protocol, llama.cpp backend, GGUF catalogue and download
+  cli.py          live / transcribe / notes / doctor / serve / models / calibrate
+tests/            segmentation, pipeline, notes and hardware tests (no model downloads)
 docs/             architecture, roadmap and evaluation plan
 ```
 
@@ -140,12 +210,13 @@ uv run pytest
 uv run ruff check .
 ```
 
-Tests never download a model: they use a fake ASR provider and synthetic audio.
+Tests never download a model: they use fake ASR/LLM providers and synthetic audio.
 
 ## Roadmap
 
-- **Phase 1 (now):** streaming captioning pipeline — capture, VAD, ASR, event stream, JSONL, WebSocket.
-- **Phase 2:** note generation (TextRank + keyword extraction) stored in SQLite.
+- **Phase 1 (done):** streaming captioning pipeline — capture, VAD, ASR, event stream, JSONL, WebSocket.
+- **Phase 2 (in progress):** note generation — TextRank extraction + grounded local LLM, Markdown
+  export; SQLite storage and REST endpoints next.
 - **Phase 3:** syllabus parsing, MiniLM embeddings + FAISS, retrieval-augmented Q&A.
 - **Phase 4:** quiz generation, topic-wise gap tracking (scikit-learn), adaptive difficulty.
 - **Phase 5:** React teacher dashboard wired to `/ws/captions` + REST endpoints; packaging.

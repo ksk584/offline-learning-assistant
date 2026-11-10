@@ -18,13 +18,23 @@ repeated 5-minute sessions, and a WER number recorded in `docs/architecture.md`.
 
 ## Phase 2 — Note generation (weeks 5–6)
 
-- Store finals in SQLite (`sessions`, `utterances`).
-- TextRank extractive summarization over each session; keyword extraction (TF-IDF / YAKE).
-- Markdown note export: summary, key points, keywords, timestamps linking back to utterances.
-- API: `GET /api/sessions`, `GET /api/sessions/{id}/notes`.
+- [x] TextRank extractive summarization over each session; keyword extraction (TF-IDF).
+- [x] Grounded local LLM rewrite behind an `LlmProvider` (llama.cpp GGUF, CPU-only).
+- [x] Hardware profiles (`potato` / `balanced` / `full`) with 0.8B / 2B / 4B Qwen3.5 models.
+- [x] Verification pass: unsupported generated lines are dropped and counted; extractive fallback.
+- [x] Markdown note export: summary, key points, terms, keywords, timestamps linking to utterances.
+- [ ] Store finals in SQLite (`sessions`, `utterances`) and notes in `notes`.
+- [ ] API: `GET /api/sessions`, `GET /api/sessions/{id}/notes`.
+- [ ] Benchmark the three profiles on the target machine and record tokens/s and peak RSS.
 
-**Acceptance:** a 50-minute lecture yields notes a student can revise from, with no invented
-content (extractive only), plus timestamps that jump to the right utterance.
+**Acceptance:** a 50-minute lecture yields notes a student can revise from. Every generated point is
+supported by the transcript (verifier drop rate recorded), and timestamps jump to the right
+utterance. On a machine without a model the same run still returns timestamped extractive notes
+instead of failing.
+
+**Measured on the dev laptop (6C/12T, 15.2 GB):** the 2B Q4_K_M loads in ~1.2 s, rewrites one
+232-token prompt at ~21 tok/s and peaks at ~1.95 GB RSS; the 0.8B model with 2 threads reaches
+~30 tok/s at ~0.9 GB. See `docs/architecture.md` for the profile table and evaluation protocol.
 
 ## Phase 3 — Syllabus retrieval and Q&A (weeks 7–8)
 
@@ -64,6 +74,8 @@ complete teacher workflow demo without a terminal.
 1. Record a 10-minute lecture with the intended microphone; run
    `ila transcribe lecture.wav --out events.jsonl`.
 2. Hand-correct that clip for a WER baseline (`base.en` vs `small.en`).
-3. Decide the Phase 2 SQLite schema details with the team (session boundaries, course ids).
-4. Set up the React app (`npm create vite@latest dashboard -- --template react-ts`) against
+3. Run `ila notes events.jsonl` and score the result with the note rubric in
+   `docs/architecture.md`; record the verifier drop rate and the fallback frequency.
+4. Decide the Phase 2 SQLite schema details with the team (session boundaries, course ids).
+5. Set up the React app (`npm create vite@latest dashboard -- --template react-ts`) against
    `/ws/captions` with mock data first.

@@ -6,6 +6,7 @@ Every value can be overridden with ``ILA_*`` environment variables or a
     ILA_ASR__MODEL=small.en
     ILA_VAD__MIN_SILENCE_MS=600
     ILA_PARTIALS__ENABLED=false
+    ILA_LLM__PROFILE=potato
 
 Models and session data live under ``ILA_HOME`` (default ``~/.ila``) so the
 whole application folder stays portable and git-friendly.
@@ -33,6 +34,10 @@ def default_model_dir() -> Path:
 
 def default_data_dir() -> Path:
     return ila_home() / "data"
+
+
+def default_llm_dir() -> Path:
+    return default_model_dir() / "llm"
 
 
 class AudioSettings(BaseModel):
@@ -91,6 +96,36 @@ class AsrSettings(BaseModel):
     local_files_only: bool = False
 
 
+class LlmSettings(BaseModel):
+    """Local GGUF model used to rewrite selected transcript content into notes.
+
+    Note generation is extractive-first: TextRank chooses the sentences that
+    carry the lecture, and the model only rewrites those short excerpts. That
+    keeps prompt sizes small enough for a 2B model on a 4-core CPU.
+    """
+
+    enabled: bool = True
+    #: ``auto`` picks potato / balanced / full from detected hardware.
+    profile: str = "auto"
+    #: Explicit GGUF path; overrides ``profile`` when set.
+    model_path: Path | None = None
+    model_dir: Path = Field(default_factory=default_llm_dir)
+    n_ctx: int = 4096
+    #: ``0`` uses physical cores minus one.
+    n_threads: int = 0
+    n_batch: int = 256
+    max_tokens: int = 320
+    temperature: float = 0.2
+    top_p: float = 0.9
+    #: Wall-clock budget for all LLM calls on one lecture. The remaining chunks
+    #: fall back to extractive notes instead of making the user wait.
+    budget_s: float = 90.0
+    #: Transcript characters sent per call; raise it on stronger machines.
+    chunk_chars: int = 2200
+    #: Refuse to load a model file smaller than this (catches broken downloads).
+    min_model_bytes: int = 20_000_000
+
+
 class ServerSettings(BaseModel):
     host: str = "127.0.0.1"
     port: int = 8765
@@ -109,6 +144,7 @@ class Settings(BaseSettings):
     vad: VadSettings = Field(default_factory=VadSettings)
     partials: PartialSettings = Field(default_factory=PartialSettings)
     asr: AsrSettings = Field(default_factory=AsrSettings)
+    llm: LlmSettings = Field(default_factory=LlmSettings)
     server: ServerSettings = Field(default_factory=ServerSettings)
     #: Where transcripts / JSONL event logs are written by default.
     data_dir: Path = Field(default_factory=default_data_dir)

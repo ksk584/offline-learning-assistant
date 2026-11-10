@@ -20,6 +20,7 @@ from ila.asr import create_asr
 from ila.audio import FileSource, MicrophoneSource, list_input_devices
 from ila.config import Settings, ila_home, load_settings
 from ila.events import CaptionEvent, SessionSummary
+from ila.notes import TranscriptLine, generate_notes, lines_from_text
 from ila.pipeline import CaptionPipeline
 from ila.segmenter import SpeechSegmenter
 
@@ -178,6 +179,10 @@ def transcribe(
     text_out: Annotated[
         Path | None, typer.Option("--text-out", help="Write the plain transcript to a file")
     ] = None,
+    notes_out: Annotated[
+        Path | None,
+        typer.Option("--notes-out", help="Also generate grounded Markdown notes"),
+    ] = None,
     realtime: Annotated[
         bool, typer.Option("--realtime", help="Pace playback at real time")
     ] = False,
@@ -205,6 +210,8 @@ def transcribe(
         text_out.parent.mkdir(parents=True, exist_ok=True)
         text_out.write_text(summary.transcript + "\n", encoding="utf-8")
         console.print(f"[green]transcript[/green] {text_out}")
+    if notes_out:
+        _write_notes(summary.events, settings, notes_out, title=path.stem)
     _print_summary(summary, settings)
 
 
@@ -224,6 +231,195 @@ def _write_jsonl(path: Path, events: list[CaptionEvent]) -> None:
     with path.open("w", encoding="utf-8") as handle:
         for event in events:
             handle.write(json.dumps(event.to_dict(), ensure_ascii=False) + "\n")
+
+
+def _write_notes(
+    events: list[CaptionEvent], settings: Settings, path: Path, *, title: str
+) -> None:
+    from ila.notes import lines_from_events
+
+    result = generate_notes(lines_from_events(events), settings.llm, title=title)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(result.to_markdown(), encoding="utf-8")
+    engine = result.model if result.used_llm else "extractive"
+    console.print(
+        f"[green]notes[/green] {path} "
+        f"[dim]({len(result.points)} points via {engine}, {result.latency_s:.1f}s)[/dim]"
+    )
+    if result.fallback_reason and not result.used_llm:
+        console.print(f"[yellow]notes fallback:[/yellow] {result.fallback_reason}")
+
+
+def _load_lines(path: Path) -> list[TranscriptLine]:
+    from ila.notes import lines_from_events
+    from ila.text import normalize_transcript
+
+    if path.suffix.lower() in {".jsonl", ".ndjson"}:
+        events: list[CaptionEvent] = []
+        for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                item = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if item.get("type", "caption") != "caption":
+                continue
+            if item.get("kind", "final") != "final":
+                continue
+            text = normalize_transcript(str(item.get("text", "")))
+            if not text:
+                continue
+            events.append(
+                CaptionEvent(
+                    utterance_id=int(item.get("utterance_id", 0)),
+                    text=text,
+                    start=float(item.get("start") or 0.0),
+                    end=float(item.get("end") or 0.0),
+                    final=True,
+                    language=item.get("language"),
+                )
+            )
+        return lines_from_events(events)
+
+    return lines_from_text(path.read_text(encoding="utf-8", errors="replace"))
+
+
+def _default_title(path: Path) -> str:
+    """``lecture.events.jsonl`` -> ``lecture``."""
+    return path.stem.replace(".events", "") or path.name
+
+
+@app.command()
+def notes(
+    path: Annotated[
+        Path, typer.Argument(help="Caption events (.jsonl) or a plain transcript (.txt/.md)")
+    ],
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Where to write the Markdown notes")
+    ] = None,
+    title: Annotated[str | None, typer.Option("--title", help="Note heading")] = None,
+    profile: Annotated[
+        str, typer.Option("--profile", help="auto, potato, balanced or full")
+    ] = "auto",
+    no_llm: Annotated[
+        bool, typer.Option("--no-llm", help="Extractive notes only (no model load)")
+    ] = False,
+    budget_s: Annotated[
+        float | None, typer.Option("--budget-s", help="Wall-clock budget for model calls")
+    ] = None,
+    verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
+) -> None:
+    """Generate timestamped, grounded study notes from a transcript."""
+    _configure_logging(verbose)
+    if not path.exists():
+        raise typer.BadParameter(f"File not found: {path}")
+
+    settings = load_settings()
+    if no_llm:
+        settings.llm.enabled = False
+    if budget_s is not None:
+        settings.llm.budget_s = budget_s
+
+    lines = _load_lines(path)
+    if not lines:
+        raise typer.BadParameter(f"No transcript text found in {path}")
+
+    console.print(
+        f"[dim]transcript[/dim] {len(lines)} lines "
+        f"[dim]profile[/dim] {'extractive' if no_llm else profile}"
+    )
+    result = generate_notes(
+        lines,
+        settings.llm,
+        title=title or _default_title(path),
+        profile=None if profile == "auto" else profile,
+    )
+
+    target = out or path.with_suffix(".notes.md")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(result.to_markdown(), encoding="utf-8")
+
+    console.print(result.to_markdown(), markup=False)
+    engine = result.model if result.used_llm else "extractive"
+    console.print(
+        f"[green]notes[/green] {target} "
+        f"[dim]({len(result.points)} points, {result.dropped} unsupported line(s) dropped, "
+        f"{engine}, {result.latency_s:.1f}s)[/dim]"
+    )
+    if result.fallback_reason and not result.used_llm:
+        console.print(f"[yellow]fallback:[/yellow] {result.fallback_reason}")
+
+
+@app.command()
+def doctor() -> None:
+    """Check whether this machine is ready for fully offline note generation."""
+    import platform
+
+    from rich.markup import escape
+
+    from ila import hardware
+    from ila.llm import PROFILE_MODELS, llama_cpp_installed, resolve_profile
+    from ila.llm.llama_cpp import LlamaCppProvider
+
+    settings = load_settings()
+    hw = hardware.detect()
+    profile = resolve_profile(settings.llm.profile)
+    spec = PROFILE_MODELS[profile]
+    provider = LlamaCppProvider(settings.llm, profile=profile)
+    model_path = provider.path
+
+    asr_pattern = f"models--*--faster-whisper-{settings.asr.model}"
+    asr_ready = any(Path(settings.asr.model_dir).glob(asr_pattern))
+
+    table = Table(title="Offline readiness", show_lines=False)
+    table.add_column("Check")
+    table.add_column("Status")
+    table.add_column("Detail")
+    table.add_row("Python", platform.python_version(), platform.platform())
+    table.add_row("Hardware", hw.summary, hw.reason)
+    table.add_row(
+        "Notes profile",
+        profile,
+        f"{spec.download_gb:.2f} GB download, ~{spec.ram_gb:.1f} GB RAM at 4k ctx",
+    )
+    table.add_row(
+        "llama.cpp runtime",
+        "ok" if llama_cpp_installed() else "missing",
+        escape('uv pip install -e ".[llm]"')
+        if not llama_cpp_installed()
+        else "llama-cpp-python",
+    )
+    if model_path.is_file():
+        size = model_path.stat().st_size
+        size_mb = size / (1024**2)
+        intact = size == spec.size_bytes
+        expected_mb = spec.size_bytes / (1024**2)
+        detail = (
+            f"{model_path.name} ({size_mb:.0f} MB)"
+            if intact
+            else f"{size_mb:.0f} MB of {expected_mb:.0f} MB; re-run `ila download-llm`"
+        )
+        table.add_row("Notes model", "ok" if intact else "incomplete", detail)
+    else:
+        table.add_row("Notes model", "missing", "ila download-llm")
+    table.add_row(
+        "Whisper model",
+        "ok" if asr_ready else "missing",
+        f"{settings.asr.model} in {settings.asr.model_dir}",
+    )
+    table.add_row("Storage", str(ila_home()), "models and session data")
+    console.print(table)
+
+    ready = llama_cpp_installed() and model_path.is_file()
+    if ready:
+        console.print("[green]Ready:[/green] notes can be generated fully offline.")
+    else:
+        console.print(
+            "[yellow]Extractive only:[/yellow] captions and TextRank notes still work; "
+            "run `ila download-llm` for abstractive notes."
+        )
 
 
 @app.command()
@@ -290,6 +486,41 @@ def download_model(
     info = create_asr(settings.asr).info
     console.print(f"[green]ready[/green] {info.model} on {info.device} ({info.compute_type})")
     console.print("[dim]Set ILA_ASR__LOCAL_FILES_ONLY=true to guarantee offline use.[/dim]")
+
+
+@app.command("download-llm")
+def download_llm(
+    profile: Annotated[
+        str, typer.Option("--profile", help="auto, potato, balanced or full")
+    ] = "auto",
+    force: Annotated[
+        bool, typer.Option("--force", help="Re-download even if the file exists")
+    ] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
+) -> None:
+    """Download the local notes model (0.5-2.5 GB, one-time network access)."""
+    _configure_logging(verbose)
+
+    from ila.llm import PROFILE_MODELS, resolve_profile
+    from ila.llm.download import download_model
+
+    settings = load_settings()
+    resolved = resolve_profile(profile)
+    spec = PROFILE_MODELS[resolved]
+    target = Path(settings.llm.model_dir).expanduser() / spec.filename
+    console.print(
+        f"[dim]profile[/dim] {resolved} [dim]{spec.note}[/dim]\n"
+        f"[dim]source[/dim] hf.co/{spec.repo}/{spec.filename} (~{spec.download_gb:.2f} GB)"
+    )
+
+    if target.is_file() and target.stat().st_size >= settings.llm.min_model_bytes and not force:
+        console.print(f"[green]already present[/green] {target}")
+        return
+
+    path = download_model(settings.llm, profile=resolved)
+    size_mb = path.stat().st_size / (1024**2)
+    console.print(f"[green]ready[/green] {path} ({size_mb:.0f} MB)")
+    console.print("[dim]Everything now runs offline; verify with `ila doctor`.[/dim]")
 
 
 @app.command()
