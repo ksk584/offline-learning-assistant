@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Local models, transcripts and databases (downloaded / generated, not source)
+.models/
+.data/
+*.wav
+*.jsonl
+!tests/fixtures/*.jsonl
+
+# Env
+.env
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

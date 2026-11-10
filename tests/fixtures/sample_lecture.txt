@@ -1,0 +1,1 @@
+Today we will discuss retrieval augmented generation. First, the lecturer explains how documents are split into chunks. Then each chunk is embedded into a vector space. The system retrieves the most relevant chunks before answering the student's question.
