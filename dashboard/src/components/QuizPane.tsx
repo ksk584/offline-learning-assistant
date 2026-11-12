@@ -830,7 +830,7 @@ export function QuizPane({
             <div className="quiz-start-actions">
               <button
                 type="button"
-                className="btn primary"
+                className="btn btn-primary"
                 onClick={() => void start()}
                 disabled={loading || !trimmedStudent}
               >

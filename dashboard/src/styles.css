@@ -366,32 +366,55 @@ pre {
 /* Segmented Controls (Linear Style) */
 .segmented, .segmented-control {
   display: inline-flex;
-  background: rgba(0, 0, 0, 0.35);
-  padding: 2px;
-  border-radius: var(--radius-sm);
+  align-items: center;
+  background: rgba(14, 18, 24, 0.7);
+  padding: 3px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
-  gap: 2px;
+  gap: 4px;
 }
-.segmented button, .segmented-item {
-  height: 26px;
-  padding: 0 10px;
-  font-size: 0.78rem;
+.segmented button, .segmented-item, .segmented-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 14px;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
   font-weight: 500;
-  border: none;
-  border-radius: var(--radius-xs);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
   transition: all var(--transition-fast);
 }
-.segmented button:hover, .segmented-item:hover {
-  color: var(--text-primary);
+.segmented button svg, .segmented-item svg, .segmented-btn svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  opacity: 0.85;
 }
-.segmented button.active, .segmented-item.active {
-  background: var(--bg-surface-elevated);
+.segmented button:hover:not(.active), .segmented-item:hover:not(.active), .segmented-btn:hover:not(.active) {
   color: var(--text-primary);
-  box-shadow: var(--shadow-sm);
+  background: rgba(255, 255, 255, 0.04);
+}
+.segmented button:hover:not(.active) svg, .segmented-item:hover:not(.active) svg, .segmented-btn:hover:not(.active) svg {
+  opacity: 1;
+}
+.segmented button.active, .segmented-item.active, .segmented-btn.active {
+  background: var(--bg-surface-elevated);
+  border-color: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   font-weight: 600;
+}
+.segmented button.active svg, .segmented-item.active svg, .segmented-btn.active svg {
+  opacity: 1;
+  color: var(--accent);
 }
 
 /* Badges & Chips */
@@ -1485,12 +1508,148 @@ pre {
   color: #cbd5e1;
 }
 
-/* Weakest Topics & Gaps Sidebar */
-.quiz-setup-grid {
+/* Quiz Workspace & Layout */
+.study-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.quiz-layout {
   display: grid;
   grid-template-columns: 1fr 340px;
   gap: 20px;
 }
+
+.quiz-start {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 24px 28px;
+  max-width: 820px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.quiz-start-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.quiz-start-copy .empty-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent-border);
+  color: var(--accent-text);
+  flex-shrink: 0;
+}
+
+.quiz-start-copy .empty-icon-wrap svg {
+  width: 22px;
+  height: 22px;
+}
+
+.quiz-start-copy h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 6px 0;
+}
+
+.quiz-start-copy p {
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  margin: 0 0 6px 0;
+}
+
+.quiz-start-copy .empty-subtext {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.quiz-setup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px 24px;
+}
+
+.quiz-setup-grid .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quiz-setup-grid .field label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.quiz-setup-grid .text-input,
+.quiz-setup-grid .select {
+  height: 38px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface-subtle);
+  color: var(--text-primary);
+  font-size: 0.86rem;
+  font-family: var(--font-sans);
+  transition: border-color var(--transition-fast);
+}
+
+.quiz-setup-grid .text-input:focus,
+.quiz-setup-grid .select:focus {
+  border-color: var(--border-focus);
+  outline: none;
+}
+
+.quiz-start-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.quiz-start-actions .btn {
+  height: 38px;
+  padding: 0 22px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  gap: 8px;
+}
+
+.quiz-start-actions .quiz-start-note {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.quiz-complete-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+/* Weakest Topics & Gaps Sidebar */
 
 .quiz-side {
   display: flex;
