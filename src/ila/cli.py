@@ -421,6 +421,178 @@ def notes(
 
 
 @app.command()
+def ask(
+    question: Annotated[str, typer.Argument(help="Question about the lecture or syllabus")],
+    class_level: Annotated[
+        int, typer.Option("--class-level", "-c", help="NCERT class (8, 9, 10)")
+    ] = 10,
+    subject: Annotated[
+        str, typer.Option("--subject", "-s", help="science or maths")
+    ] = "science",
+    text: Annotated[
+        Path | None,
+        typer.Option("--text", help="Transcript file; default uses the built-in demo"),
+    ] = None,
+    use_llm: Annotated[
+        bool, typer.Option("--llm", help="Let the local model compose the answer")
+    ] = False,
+) -> None:
+    """Ask a grounded question and print the answer with citations."""
+    from ila.demo import find_demo
+    from ila.notes import TranscriptLine, lines_from_text
+    from ila.retrieval import AnswerEngine, KnowledgeBase
+
+    settings = load_settings()
+    if text is not None:
+        if not text.exists():
+            raise typer.BadParameter(f"File not found: {text}")
+        lines = lines_from_text(text.read_text(encoding="utf-8", errors="replace"))
+        title = text.stem
+    else:
+        lecture, _ = find_demo(class_level, subject)
+        lines = [
+            TranscriptLine(text=line.text, start=line.start, end=line.end)
+            for line in lecture.lines
+        ]
+        title = lecture.title
+
+    knowledge = KnowledgeBase.from_lines(lines, class_level, subject, title=title)
+    llm = None
+    if use_llm:
+        from ila.llm import create_llm
+
+        llm = create_llm(settings.llm)
+    answer = AnswerEngine(knowledge, llm=llm).ask(question, use_llm=use_llm)
+
+    console.print(f"[bold]Q[/bold] {answer.question}")
+    console.print(f"[bold]A[/bold] {answer.answer}")
+    console.print(
+        f"[dim]confidence[/dim] {answer.confidence:.2f} "
+        f"[dim]engine[/dim] {answer.engine}"
+    )
+    if answer.citations:
+        table = Table(title="Sources", show_lines=False)
+        table.add_column("Chapter")
+        table.add_column("Source")
+        table.add_column("Score", justify="right")
+        for citation in answer.citations:
+            chapter = citation.get("chapter_title") or "-"
+            stamp = citation.get("start")
+            source = citation.get("source", "")
+            if stamp is not None:
+                source = f"{source} @ {_fmt_time(float(stamp))}"
+            table.add_row(str(chapter), source, f"{citation['score']:.3f}")
+        console.print(table)
+    elif not answer.answerable:
+        console.print("[yellow]No source cleared the confidence threshold.[/yellow]")
+
+
+@app.command()
+def quiz(
+    class_level: Annotated[
+        int, typer.Option("--class-level", "-c", help="NCERT class (8, 9, 10)")
+    ] = 10,
+    subject: Annotated[
+        str, typer.Option("--subject", "-s", help="science or maths")
+    ] = "science",
+    student: Annotated[
+        str, typer.Option("--student", help="Student id used for mastery tracking")
+    ] = "demo-student",
+    length: Annotated[int, typer.Option("--length", "-n", help="Questions in the quiz")] = 5,
+    topic: Annotated[
+        str | None, typer.Option("--topic", help="Chapter number or title filter")
+    ] = None,
+    difficulty: Annotated[
+        int | None, typer.Option("--difficulty", help="Start at 1 (easy) to 3 (hard)")
+    ] = None,
+) -> None:
+    """Run an adaptive, grounded quiz in the terminal."""
+    from ila.demo import find_demo
+    from ila.notes import TranscriptLine
+    from ila.quiz import QuizEngine
+    from ila.retrieval import KnowledgeBase
+    from ila.storage import Storage
+
+    settings = load_settings()
+    lecture, _ = find_demo(class_level, subject)
+    lines = [
+        TranscriptLine(text=line.text, start=line.start, end=line.end)
+        for line in lecture.lines
+    ]
+    knowledge = KnowledgeBase.from_lines(lines, class_level, subject, title=lecture.title)
+    engine = QuizEngine(Storage(settings.data_dir / "ila.sqlite3"))
+    try:
+        session = engine.start(
+            knowledge,
+            student_id=student,
+            class_level=class_level,
+            subject=subject,
+            topic=topic,
+            length=length,
+            difficulty=difficulty,
+        )
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    question = session["question"]
+    total = session["total"]
+    console.print(
+        f"[dim]quiz[/dim] {lecture.title} [dim]student[/dim] {student} "
+        f"[dim]questions[/dim] {total}"
+    )
+    while question is not None:
+        console.print()
+        console.print(
+            f"[bold]{question['prompt']}[/bold]  "
+            f"[dim]({question['topic']} · difficulty {question['difficulty']})[/dim]"
+        )
+        answer_index = None
+        answer = ""
+        if question["options"]:
+            for index, option in enumerate(question["options"]):
+                console.print(f"  {index + 1}. {option}")
+            raw = typer.prompt(f"Choose 1-{len(question['options'])}", default="1")
+            try:
+                answer_index = max(0, min(len(question["options"]) - 1, int(raw) - 1))
+            except ValueError:
+                answer_index = 0
+        else:
+            answer = typer.prompt("Your answer")
+
+        try:
+            result = engine.answer(
+                session["quiz_id"],
+                question_id=question["id"],
+                answer=answer,
+                answer_index=answer_index,
+            )
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/red]")
+            break
+        style = "green" if result["correct"] else "yellow"
+        console.print(f"[{style}]{result['feedback']}[/{style}]")
+        if result["explanation"]:
+            console.print(f"[dim]{result['explanation']}[/dim]")
+        mastery = result["mastery"]
+        console.print(
+            f"[dim]mastery[/dim] {mastery['topic']} {mastery['score']:.2f} "
+            f"[dim]progress[/dim] {result['progress']['answered']}/{result['progress']['total']}"
+        )
+        question = result["next_question"]
+
+    gaps = engine.gaps(student, limit=3)
+    if gaps["gaps"]:
+        table = Table(title="Weakest topics", show_lines=False)
+        table.add_column("Topic")
+        table.add_column("Mastery", justify="right")
+        table.add_column("Attempts", justify="right")
+        for gap in gaps["gaps"]:
+            table.add_row(gap["topic"], f"{gap['mastery']:.2f}", str(gap["attempts"]))
+        console.print(table)
+    console.print(f"[dim]overall mastery[/dim] {gaps['overall']:.2f}")
+
+
+@app.command()
 def doctor() -> None:
     """Check whether this machine is ready for fully offline note generation."""
     import platform

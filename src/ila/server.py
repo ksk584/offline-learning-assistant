@@ -88,6 +88,9 @@ from ila.notes import (
     lines_from_text,
 )
 from ila.pipeline import CaptionPipeline
+from ila.quiz import QuizEngine, build_question_bank
+from ila.retrieval import EMBEDDING_DIM, AnswerEngine, KnowledgeBase
+from ila.storage import Storage
 from ila.text import normalize_transcript
 
 logger = logging.getLogger(__name__)
@@ -194,7 +197,79 @@ class NotesRequest(BaseModel):
     budget_s: float | None = Field(default=None, gt=0, le=900)
 
 
+class AskRequest(BaseModel):
+    question: str = Field(min_length=2, max_length=500)
+    lines: list[NoteLine] = Field(default_factory=list)
+    text: str | None = None
+    session_id: str | None = None
+    class_level: int | None = None
+    subject: str | None = None
+    top_k: int = Field(default=5, ge=1, le=10)
+    min_score: float | None = Field(default=None, gt=0, le=2)
+    use_llm: bool = True
+
+
+class QuizStartRequest(BaseModel):
+    student_id: str = Field(default="demo-student", min_length=1, max_length=120)
+    class_level: int | None = None
+    subject: str | None = None
+    topic: str | None = None
+    length: int = Field(default=5, ge=1, le=20)
+    difficulty: int | None = Field(default=None, ge=1, le=3)
+    lines: list[NoteLine] = Field(default_factory=list)
+    text: str | None = None
+    session_id: str | None = None
+
+
+class QuizAnswerRequest(BaseModel):
+    quiz_id: str = Field(min_length=1)
+    question_id: str = Field(min_length=1)
+    answer: str = ""
+    answer_index: int | None = Field(default=None, ge=0, le=8)
+    response_ms: int | None = Field(default=None, ge=0, le=3_600_000)
+
+
+class RemediationGenerateRequest(BaseModel):
+    student_id: str = Field(default="demo-student", min_length=1, max_length=120)
+    topic: str | None = None
+    class_level: int | None = None
+    subject: str | None = None
+    count: int = Field(default=3, ge=1, le=10)
+    lines: list[NoteLine] = Field(default_factory=list)
+    text: str | None = None
+    session_id: str | None = None
+
+
+class RemediationAnswerRequest(BaseModel):
+    pack_id: str = Field(min_length=1)
+    student_id: str = Field(min_length=1)
+    item_id: str = Field(min_length=1)
+    answer: str = ""
+    selected_index: int | None = None
+    response_ms: int = Field(default=4000, ge=0, le=3_600_000)
+
+
+class SessionRequest(BaseModel):
+    title: str = "Lecture"
+    lines: list[NoteLine] = Field(default_factory=list)
+    text: str | None = None
+    class_level: int | None = None
+    subject: str | None = None
+    duration_s: float | None = Field(default=None, ge=0)
+    notes: dict[str, Any] | None = None
+    markdown: str | None = None
+
+
 # ------------------------------------------------------------------ helpers
+#: Lazy so importing the app (e.g. in tests) does not create a database.
+_STORE: Storage | None = None
+
+
+def _store() -> Storage:
+    global _STORE
+    if _STORE is None:
+        _STORE = Storage(SETTINGS.data_dir / "ila.sqlite3")
+    return _STORE
 def _resolved_profile(settings: Settings) -> str:
     try:
         return resolve_profile(settings.llm.profile)
@@ -279,6 +354,122 @@ def _syllabus_for(
         return None
     text = " ".join(line.text for line in lines)
     return build_syllabus_context(text, class_level, subject)
+
+
+def _demo_lines(class_level: int, subject: str) -> tuple[list[TranscriptLine], Any, bool]:
+    lecture, exact = find_demo(class_level, subject)
+    lines = [
+        TranscriptLine(text=line.text, start=line.start, end=line.end)
+        for line in lecture.lines
+    ]
+    return lines, lecture, exact
+
+
+def _lines_from_payload(
+    *,
+    lines: list[NoteLine],
+    text: str | None,
+    session_id: str | None,
+) -> tuple[list[TranscriptLine], str, dict[str, Any]]:
+    """Resolve explicit lines, a saved session, or the built-in demo."""
+    if session_id:
+        session = _store().get_session(session_id)
+        if session is None:
+            raise HTTPException(status_code=404, detail="Session not found")
+        resolved = [
+            TranscriptLine(
+                text=normalize_transcript(str(item.get("text", ""))),
+                start=item.get("start"),
+                end=item.get("end"),
+            )
+            for item in session["lines"]
+        ]
+        resolved = [line for line in resolved if line.text]
+        if not resolved:
+            raise HTTPException(status_code=400, detail="Saved session has no transcript")
+        return resolved, "session", {
+            "kind": "session",
+            "session_id": session_id,
+            "title": session["title"],
+            "text": session.get("transcript", ""),
+        }
+
+    if lines or (text and text.strip()):
+        resolved = _request_lines(NotesRequest(lines=lines, text=text))
+        return resolved, "transcript", {
+            "kind": "transcript",
+            "session_id": None,
+            "title": "Current transcript",
+            "text": " ".join(line.text for line in resolved),
+        }
+
+    return [], "demo", {}
+
+
+def _knowledge_base(
+    *,
+    lines: list[NoteLine],
+    text: str | None,
+    session_id: str | None,
+    class_level: int,
+    subject: str,
+    title: str | None = None,
+) -> tuple[KnowledgeBase, dict[str, Any]]:
+    resolved, source_kind, meta = _lines_from_payload(
+        lines=lines, text=text, session_id=session_id
+    )
+    demo = None
+    exact = True
+    if not resolved:
+        if subject == "maths" and class_level == 10:
+            source_kind = "textbook"
+            meta = {
+                "kind": "textbook",
+                "session_id": None,
+                "title": "NCERT Class 10 Mathematics Textbook",
+                "demo_id": None,
+                "exact": True,
+                "text": "NCERT Class 10 Mathematics Textbook covering all 14 chapters",
+            }
+        else:
+            resolved, demo, exact = _demo_lines(class_level, subject)
+            source_kind = "demo"
+            meta = {
+                "kind": "demo",
+                "session_id": None,
+                "title": demo.title,
+                "demo_id": demo.id,
+                "exact": exact,
+                "text": " ".join(line.text for line in resolved),
+            }
+    else:
+        meta["title"] = title or meta.get("title") or "Lecture"
+    knowledge = KnowledgeBase.from_lines(
+        resolved,
+        class_level,
+        subject,
+        title=str(meta.get("title") or "Lecture"),
+        source_kind=source_kind,
+        demo_id=demo.id if demo else None,
+        chapter_hint=demo.chapter_number if demo else None,
+    )
+    meta["lines"] = len(resolved)
+    meta["course"] = knowledge.course.label if knowledge.course else None
+    return knowledge, meta
+
+
+def _ask_llm_provider() -> LlmProvider | None:
+    if not SETTINGS.llm.enabled:
+        return None
+    try:
+        profile = resolve_profile(SETTINGS.llm.profile)
+    except ValueError:
+        profile = "balanced"
+    try:
+        return LLM_REGISTRY.get(SETTINGS, profile=profile)
+    except Exception:  # a Q&A request must still work extractively
+        logger.debug("could not create the Q&A model", exc_info=True)
+        return None
 
 
 def _generate_notes_sync(
@@ -408,6 +599,23 @@ def config() -> dict[str, Any]:
             "courses": course_catalogue(),
             "demos": demo_summaries(),
         },
+        "retrieval": {
+            "engine": "bm25+hashed-embeddings",
+            "fusion": "lexical 0.58 / dense 0.42",
+            "embedding_dim": EMBEDDING_DIM,
+            "offline": True,
+            "answers": "extractive with citations",
+        },
+        "quiz": {
+            "engine": "grounded deterministic generation",
+            "mastery": "bounded exponential moving average",
+            "kinds": ["mcq", "short"],
+            "adaptive": True,
+        },
+        "storage": {
+            "engine": "sqlite",
+            "path": str(SETTINGS.data_dir / "ila.sqlite3"),
+        },
         "server": {
             "host": settings.server.host,
             "port": settings.server.port,
@@ -440,7 +648,11 @@ def list_ncert_notes() -> list[dict[str, Any]]:
     unit_map = {
         1: ("Unit 1: Real Numbers", "Unit_1_Real_Numbers_Notes.md", 1),
         2: ("Unit 2: Polynomials", "Unit_2_Polynomials_Notes.md", 2),
-        3: ("Unit 3: Pair of Linear Equations in Two Variables", "Unit_3_Pair_of_Linear_Equations_Notes.md", 3),
+        3: (
+            "Unit 3: Pair of Linear Equations in Two Variables",
+            "Unit_3_Pair_of_Linear_Equations_Notes.md",
+            3,
+        ),
     }
     for unit_id, (title, filename, ch_num) in unit_map.items():
         file_path = NOTES_DIR / filename
@@ -497,7 +709,10 @@ def get_ncert_note(unit: int) -> dict[str, Any]:
     unit_map = {
         1: ("Unit 1: Real Numbers", "Unit_1_Real_Numbers_Notes.md"),
         2: ("Unit 2: Polynomials", "Unit_2_Polynomials_Notes.md"),
-        3: ("Unit 3: Pair of Linear Equations in Two Variables", "Unit_3_Pair_of_Linear_Equations_Notes.md"),
+        3: (
+            "Unit 3: Pair of Linear Equations in Two Variables",
+            "Unit_3_Pair_of_Linear_Equations_Notes.md",
+        ),
     }
     if unit not in unit_map:
         raise HTTPException(status_code=404, detail=f"Unit {unit} notes not found")
@@ -510,7 +725,10 @@ def get_ncert_note(unit: int) -> dict[str, Any]:
     pages = _parse_markdown_into_pages(markdown)
     notes_payload = {
         "title": title,
-        "summary": f"Concise ~10-page NCERT study notes generated by on-device LLM ({words} words, {len(pages)} pages).",
+        "summary": (
+            f"Concise ~10-page NCERT study notes generated by on-device LLM "
+            f"({words} words, {len(pages)} pages)."
+        ),
         "points": [],
         "definitions": [],
         "keywords": ["NCERT Class 10", "Mathematics", title],
@@ -615,6 +833,204 @@ async def transcribe_upload(
     finally:
         with contextlib.suppress(OSError):
             target.unlink(missing_ok=True)
+
+
+# ------------------------------------------------------------------ Q&A
+@app.post("/api/ask")
+async def ask_question(request: AskRequest) -> dict[str, Any]:
+    """Answer from the current transcript, a saved session, or the built-in demo."""
+    level, name = _selection(request.class_level, request.subject)
+    knowledge, meta = _knowledge_base(
+        lines=request.lines,
+        text=request.text,
+        session_id=request.session_id,
+        class_level=level,
+        subject=name,
+    )
+    llm = _ask_llm_provider() if request.use_llm else None
+    engine = AnswerEngine(
+        knowledge,
+        min_score=request.min_score if request.min_score is not None else 0.16,
+        top_k=request.top_k,
+        llm=llm,
+    )
+    answer = await asyncio.to_thread(
+        engine.ask,
+        request.question,
+        use_llm=request.use_llm and llm is not None,
+    )
+    payload = answer.to_dict()
+    payload["source"] = meta
+    payload["course"] = knowledge.course.label if knowledge.course else None
+    payload["chapter_matches"] = [
+        match.to_dict() for match in knowledge.chapter_matches
+    ]
+    return payload
+
+
+# ------------------------------------------------------------------ quizzes
+@app.post("/api/quiz/start")
+def start_quiz(request: QuizStartRequest) -> dict[str, Any]:
+    level, name = _selection(request.class_level, request.subject)
+    knowledge, meta = _knowledge_base(
+        lines=request.lines,
+        text=request.text,
+        session_id=request.session_id,
+        class_level=level,
+        subject=name,
+    )
+    pool = build_question_bank(knowledge)
+    if not pool:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "No grounded questions could be generated from this transcript. "
+                "Try a demo lecture with definitions, or record a longer session."
+            ),
+        )
+    engine = QuizEngine(_store())
+    try:
+        result = engine.start(
+            knowledge,
+            student_id=request.student_id,
+            class_level=level,
+            subject=name,
+            topic=request.topic,
+            length=request.length,
+            difficulty=request.difficulty,
+            pool=pool,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    result["source"] = meta
+    result["topics"] = sorted({question.topic for question in pool})
+    return result
+
+
+@app.post("/api/quiz/answer")
+def answer_quiz(request: QuizAnswerRequest) -> dict[str, Any]:
+    llm = _ask_llm_provider()
+    engine = QuizEngine(_store(), llm=llm)
+    try:
+        return engine.answer(
+            request.quiz_id,
+            question_id=request.question_id,
+            answer=request.answer,
+            answer_index=request.answer_index,
+            response_ms=request.response_ms,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/students/{student_id}/gaps")
+def student_gaps(student_id: str, limit: int = 5) -> dict[str, Any]:
+    return QuizEngine(_store()).gaps(student_id, limit=max(1, min(limit, 20)))
+
+
+# ------------------------------------------------------------------ auto-remediation
+@app.post("/api/remediation/generate")
+async def generate_remediation(request: RemediationGenerateRequest) -> dict[str, Any]:
+    from ila.remediation import AutoRemediationEngine
+
+    level, name = _selection(request.class_level, request.subject)
+    knowledge, meta = _knowledge_base(
+        lines=request.lines,
+        text=request.text,
+        session_id=request.session_id,
+        class_level=level,
+        subject=name,
+    )
+    llm = _ask_llm_provider()
+    engine = AutoRemediationEngine(_store(), llm=llm)
+    result = await asyncio.to_thread(
+        engine.generate_remediation_pack,
+        knowledge,
+        student_id=request.student_id,
+        topic=request.topic,
+        count=request.count,
+    )
+    result["source"] = meta
+    return result
+
+
+@app.post("/api/remediation/submit")
+def submit_remediation(request: RemediationAnswerRequest) -> dict[str, Any]:
+    from ila.remediation import AutoRemediationEngine
+
+    llm = _ask_llm_provider()
+    engine = AutoRemediationEngine(_store(), llm=llm)
+    try:
+        return engine.evaluate_remediation_answer(
+            pack_id=request.pack_id,
+            student_id=request.student_id,
+            item_id=request.item_id,
+            answer=request.answer,
+            selected_index=request.selected_index,
+            response_ms=request.response_ms,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+# ------------------------------------------------------------------ teacher dashboard
+@app.get("/api/teacher/overview")
+def teacher_overview() -> dict[str, Any]:
+    return _store().teacher_overview()
+
+
+@app.get("/api/teacher/students")
+def teacher_students() -> dict[str, Any]:
+    students = _store().list_students()
+    return {"students": students}
+
+
+@app.get("/api/teacher/students/{student_id}")
+def teacher_student_detail(student_id: str) -> dict[str, Any]:
+    engine = QuizEngine(_store())
+    gaps_info = engine.gaps(student_id, limit=10)
+    mastery_rows = _store().list_mastery(student_id)
+    recent = _store().recent_attempts(student_id, limit=50)
+    return {
+        "student_id": student_id,
+        "gaps": gaps_info.get("gaps", []),
+        "overall": gaps_info.get("overall", 0.0),
+        "attempts": gaps_info.get("attempts", 0),
+        "classifier_model": gaps_info.get("classifier_model", "DecisionTreeClassifier"),
+        "mastery": mastery_rows,
+        "recent_attempts": recent,
+    }
+
+
+# ---------------------------------------------------------------- saved sessions
+@app.post("/api/sessions")
+def create_session(request: SessionRequest) -> dict[str, Any]:
+    level, name = _selection(request.class_level, request.subject)
+    lines = _request_lines(NotesRequest(lines=request.lines, text=request.text))
+    session_id = _store().save_session(
+        title=request.title.strip() or "Lecture",
+        class_level=level,
+        subject=name,
+        lines=[line.to_dict() for line in lines],
+        transcript=" ".join(line.text for line in lines),
+        duration_s=request.duration_s,
+        notes=request.notes,
+        markdown=request.markdown,
+    )
+    return {"id": session_id, "session": _store().get_session(session_id)}
+
+
+@app.get("/api/sessions")
+def list_sessions(limit: int = 50) -> dict[str, Any]:
+    return {"sessions": _store().list_sessions(limit=max(1, min(limit, 200)))}
+
+
+@app.get("/api/sessions/{session_id}")
+def get_session(session_id: str) -> dict[str, Any]:
+    session = _store().get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
 
 
 # ---------------------------------------------------------------- WebSocket
@@ -754,7 +1170,11 @@ async def _pump(
 # ---------------------------------------------------------------- dashboard & notes view
 HTML_NOTES_DIR = NOTES_DIR / "html"
 if HTML_NOTES_DIR.is_dir():
-    app.mount("/notes-view", StaticFiles(directory=str(HTML_NOTES_DIR), html=True), name="notes_html")
+    app.mount(
+        "/notes-view",
+        StaticFiles(directory=str(HTML_NOTES_DIR), html=True),
+        name="notes_html",
+    )
 
 if DASHBOARD_DIST.is_dir():
     app.mount("/", StaticFiles(directory=str(DASHBOARD_DIST), html=True), name="dashboard")

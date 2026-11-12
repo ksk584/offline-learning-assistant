@@ -1,20 +1,32 @@
 # Offline Intelligent Lecture Assistant
 
 On-device lecture assistant for **SDG 4 (Quality Education)** — no cloud, no API keys, no internet
-after setup. Phase 1 (this repo, today) is the **captioning pipeline**: capture audio, find speech
-boundaries, transcribe locally with Whisper, and stream caption events.
+after setup. The repository now covers the full study loop:
 
-Planned phases build on the same event stream: structured notes (TextRank + a small local
-LLM), syllabus-aware Q&A (MiniLM + FAISS), adaptive quizzes (scikit-learn), all shown in a React
-teacher dashboard.
+1. **Caption** a live lecture or uploaded recording with local Whisper.
+2. **Summarise** it into grounded, timestamped notes (TextRank + a small local LLM).
+3. **Ask** syllabus questions and get an answer that cites a retrieved NCERT passage — or a
+   refusal when nothing clears the threshold.
+4. **Practise** with deterministic MCQs and short answers whose difficulty adapts to a per-topic
+   mastery estimate stored in SQLite.
+
+It is built for low-end Windows hardware: CPU `int8` Whisper, a 0.8B-parameter notes model floor,
+pure-Python BM25 + hashed-embedding retrieval (no FAISS/MiniLM), and an explainable mastery update
+instead of a trained model. The default curriculum is NCERT/CBSE Class 8–10 Science and Mathematics.
 
 ```text
 mic / file ──▶ adaptive VAD ──▶ utterance segmenter ──▶ faster-whisper (local) ──▶ caption events
                 (noise floor)     (roll padding,          (int8 CPU by default)     final / partial
                                    forced splits)                                   + JSONL / WebSocket
-                                                                                            │
-                                              notes ──▶ grounded local LLM ◀── TextRank ◀──┘
-                                              (.md)     (Qwen3.5 GGUF, CPU)     (extractive)
+                                                                                             │
+                    ┌────────────────────────────────────────────────────────────────────────┤
+                    ▼                            ▼                                           ▼
+             grounded notes              syllabus Q&A                             adaptive quiz
+          TextRank + Qwen3.5 GGUF      BM25 + hashed vectors                 deterministic bank +
+          verifier + timestamps        citations or refusal                 EMA mastery + gaps
+                    └────────────────────────────┬───────────────────────────────────────────┘
+                                                 ▼
+                                    SQLite + React dashboard
 ```
 
 ## One-Click Setup & Run (Windows)
@@ -73,6 +85,14 @@ ila notes .\lecture.txt --profile potato                    # smallest model
 ila notes .\lecture.txt --no-llm                            # extractive only, no model load
 ```
 
+Ask a grounded question or practise with an adaptive quiz from the terminal (both fall back to the
+built-in NCERT demo when no transcript file is supplied):
+
+```powershell
+ila ask "What is the discriminant?" --class-level 10 --subject maths
+ila quiz --class-level 10 --subject maths --student demo-student --length 5
+```
+
 Check what this machine can run before a demo:
 
 ```powershell
@@ -86,10 +106,10 @@ powershell -ExecutionPolicy Bypass -File scripts\make_test_audio.ps1
 ila transcribe tests\fixtures\sample_lecture.wav
 ```
 
-Serve the local API for the future dashboard:
+Serve the local API and the built React dashboard:
 
 ```powershell
-ila serve            # http://127.0.0.1:8765  (WebSocket: /ws/captions)
+ila serve            # http://127.0.0.1:8765  (dashboard, REST, /ws/captions)
 ```
 
 ### Troubleshooting
@@ -114,7 +134,12 @@ ila serve            # http://127.0.0.1:8765  (WebSocket: /ws/captions)
 | Names and jargon | Each final caption seeds the next Whisper prompt (`initial_prompt`) for spelling continuity |
 | Hallucinations on silence | VAD gating **plus** a no-speech/log-probability confidence filter |
 | CPU-only machines | faster-whisper with `int8`, configurable `cpu_threads`, measured realtime factor in every run |
-| Testability | Segmenter and pipeline are hardware-free and covered by unit tests with synthetic audio |
+| Testability | Segmenter, pipeline, retrieval, quiz and storage are hardware-free and covered by unit tests with synthetic audio |
+| Syllabus grounding | Six NCERT Class 8–10 Science/Maths courses; chapter matching steers notes and Q&A |
+| Answer safety | Extractive-first answers always cite retrieved passages; a hard score gate refuses unrelated questions |
+| Quiz grounding | Every question is generated from a lecture/notes definition or statement; no invented options or answers |
+| Adaptive mastery | Explainable bounded EMA per topic, difficulty recalculated after each answer, weakest-topic gaps for teachers |
+| Persistence | SQLite via stdlib `sqlite3`: sessions, utterances, notes, quiz state, attempts and mastery |
 | Offline deployment | Models live under `ILA_HOME`; set `ILA_ASR__LOCAL_FILES_ONLY=true` to forbid network access |
 
 ## Notes generation
@@ -140,6 +165,69 @@ nothing contacts the network at runtime.
 Measured on the dev laptop with threads constrained to emulate a small machine: the 0.8B model with
 2 threads generates at ~30 tok/s and peaks under 1 GB RSS; the 2B model with 5 threads reaches
 ~21 tok/s at ~2 GB. Both fit the "potato PC" target with room for Whisper alongside.
+
+## Syllabus Q&A
+
+Q&A is **retrieval-then-quote**, not free generation. Each final utterance, the generated notes and
+the matched NCERT syllabus cards become passages in a `KnowledgeBase`. Retrieval fuses:
+
+* BM25 over stemmed content words, and
+* a 384-dimensional hashed lexical embedding (cosine similarity),
+
+so ranking stays fast and deterministic on a CPU with no model download. The answer engine searches
+lecture content only, extracts the best supporting sentence, and returns its chapter, timestamp and
+retrieval score as citations. If the top passage does not clear `min_score` (0.16 by default), the
+answer is a refusal with no citations. An optional local-LLM rewrite is accepted only when its
+content words are supported by the retrieved excerpt.
+
+The acceptance set contains 20 questions across all six demos. The current build cites the expected
+NCERT chapter for **20/20**, and questions such as "Who won the 2011 cricket World Cup?" or "How do
+you bake a chocolate cake?" are refused. Run `ila ask` or use the **Syllabus Q&A** dashboard tab.
+
+## Adaptive quizzes
+
+Questions are deterministic and grounded:
+
+* definition MCQs (`Which option best defines "discriminant"?`),
+* cloze MCQs built from a lecture sentence, and
+* short-answer questions with keyword-based grading.
+
+Generation filters noisy note headings, placeholders and formula fragments, so the bank is smaller
+than a generic quiz generator but every item traces back to a lecture passage. Lecture questions are
+preferred; master notes only top up a short bank.
+
+Each answer updates a bounded exponential moving average for the topic:
+
+```text
+mastery ← mastery + α · (target − mastery)
+```
+
+where `target` is 1 for a correct answer and 0 for an incorrect one, and `α` grows with difficulty
+and shrinks with slow responses. Mastery maps back to difficulty 1 (foundation), 2 (core) or 3
+(challenge), so a correct streak raises difficulty and a wrong streak eases it.
+
+### Knowledge Gap Diagnostics (Scikit-Learn ML Classifier)
+
+Topic accuracy, normalized response latencies, attempts, and difficulty are evaluated using calibrated
+**Decision Tree** and **Logistic Regression** classifiers (`src/ila/gaps.py`) to diagnose learning states:
+- `Critical Gap` (Foundation tier, difficulty 1): severe misconception, low accuracy, or high hesitation.
+- `Needs Review` (Core tier, difficulty 2): moderate understanding with retention inconsistencies.
+- `Proficient` (Challenge tier, difficulty 3): fluent mastery ready for advanced HOTS problems.
+
+### Auto-Remediation & Adaptive Feedback Loop
+
+When a knowledge gap is diagnosed, students or teachers can launch an **Auto-Remediation Drill** (`src/ila/remediation.py`):
+1. **Curriculum Concept Primer**: Generates grounded conceptual primers from NCERT textbooks using the local Qwen 3.5 LLM.
+2. **Targeted Drill Items**: Produces fill-in-the-blank, true/false, short answer, and MCQ practice focusing on weak topics.
+3. **Closing the Feedback Loop**: Immediate submission updates SQLite mastery with accelerated recovery credit (+0.08 remediation boost) and re-evaluates post-remediation diagnostics.
+
+### Teacher Dashboard & SQLite Analytics
+
+Available via the **👩‍🏫 Teacher Analytics & Gaps** dashboard tab (`/api/teacher/overview`):
+- Classroom overview KPIs (total sessions, questions answered, average accuracy, response speed, class mastery).
+- Topic mastery heatmap table with visual health badges (`Critical Gap`, `Needs Review`, `Proficient`).
+- Individual student diagnostic drilldown with gap probabilities.
+- SQLite saved lecture sessions history with metadata previews.
 
 ## Performance tuning
 
@@ -182,10 +270,34 @@ Every setting is an environment variable (or `.env` entry) using `__` for nested
 | `ILA_LLM__BUDGET_S` | `90` | Wall-clock budget for all model calls per lecture |
 | `ILA_LLM__N_CTX` | `4096` | Context window; lower saves RAM |
 | `ILA_LLM__N_THREADS` | `0` | `0` = physical cores minus one |
+| `ILA_CURRICULUM__CLASS_LEVEL` | `10` | Default NCERT class (8, 9 or 10) |
+| `ILA_CURRICULUM__SUBJECT` | `science` | Default subject (`science` or `maths`) |
 | `ILA_AUDIO__DEVICE` | system default | Microphone index from `ila devices` |
+| `ILA_SERVER__PORT` | `8765` | Local API/dashboard port |
 | `ILA_HOME` | `~/.ila` | Model and data directory |
+| `ILA_DATA_DIR` | `ILA_HOME/data` | Sessions, notes and `ila.sqlite3` |
 
 `ila info` prints the fully resolved configuration.
+
+## REST API
+
+The dashboard talks only to the local FastAPI server (`127.0.0.1:8765`):
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/config` | Resolved ASR/notes/retrieval/quiz/storage metadata and curriculum catalogue |
+| `GET /api/demo?class_level=&subject=` | Built-in NCERT demo lecture for offline demos and Q&A/quiz fallback |
+| `POST /api/notes` | Grounded notes from caption lines or plain text |
+| `POST /api/transcribe` | Upload audio/video (≤ 250 MB); returns finals and optional notes |
+| `GET /api/ncert-notes`, `GET /api/ncert-notes/{unit}` | Generated Class 10 Maths master notes and pages |
+| `POST /api/ask` | Grounded answer with citations, or a refusal; optional saved `session_id` |
+| `POST /api/quiz/start` | Build a grounded quiz and return the first adaptive question |
+| `POST /api/quiz/answer` | Grade one answer, update mastery and return the next question |
+| `GET /api/students/{id}/gaps` | Weakest three topics and recommended difficulty |
+| `POST/GET /api/sessions`, `GET /api/sessions/{id}` | Persist and reload lecture sessions |
+
+Request/response models live in `src/ila/server.py`; the TypeScript contracts are in
+`dashboard/src/types.ts`.
 
 ## WebSocket contract
 
@@ -212,32 +324,42 @@ src/ila/
   asr/            provider protocol + faster-whisper implementation
   pipeline.py     source -> segmenter -> ASR -> CaptionEvent stream
   events.py       event + session-summary contract shared with the dashboard
-  server.py       FastAPI + WebSocket transport
+  server.py       FastAPI REST + WebSocket transport for dashboard, Q&A and quizzes
   hardware.py     RAM/CPU detection and profile thresholds (no psutil)
   notes.py        TextRank extraction, grounded LLM prompting, verification, Markdown
+  curriculum.py   six NCERT courses, chapter matching and syllabus context
+  demo.py         six built-in NCERT demo lectures used for offline demos/fallback
+  retrieval.py    BM25 + hashed embeddings, citations, extractive/verified answers
+  quiz.py         grounded question bank, grading, adaptive mastery and gaps
+  storage.py      stdlib sqlite3 schema for sessions, quiz state, attempts and mastery
   llm/            provider protocol, llama.cpp backend, GGUF catalogue and download
-  cli.py          live / transcribe / notes / doctor / serve / models / calibrate
-tests/            segmentation, pipeline, notes and hardware tests (no model downloads)
+  cli.py          live / transcribe / notes / ask / quiz / doctor / serve / calibrate
+dashboard/        React + Vite + TypeScript teacher/student dashboard
+tests/            segmentation, pipeline, notes, retrieval, quiz and storage tests
 docs/             architecture, roadmap and evaluation plan
 ```
 
 ## Tests
 
 ```powershell
-uv run pytest
-uv run ruff check .
+uv run --extra dev python -m pytest -q
+uv run --extra dev ruff check .
 ```
 
-Tests never download a model: they use fake ASR/LLM providers and synthetic audio.
+The dev extra installs pytest, ruff and httpx into the project environment. Tests never download a
+model: they use fake ASR/LLM providers, synthetic audio and temporary SQLite files.
 
 ## Roadmap
 
 - **Phase 1 (done):** streaming captioning pipeline — capture, VAD, ASR, event stream, JSONL, WebSocket.
-- **Phase 2 (in progress):** note generation — TextRank extraction + grounded local LLM, Markdown
-  export; SQLite storage and REST endpoints next.
-- **Phase 3:** syllabus parsing, MiniLM embeddings + FAISS, retrieval-augmented Q&A.
-- **Phase 4:** quiz generation, topic-wise gap tracking (scikit-learn), adaptive difficulty.
-- **Phase 5:** React teacher dashboard wired to `/ws/captions` + REST endpoints; packaging.
+- **Phase 2 (done):** grounded notes — TextRank extraction, local Qwen3.5 rewrite, verifier, Markdown
+  export, hardware profiles, SQLite session storage and REST endpoints.
+- **Phase 3 (done):** syllabus retrieval and Q&A — NCERT curriculum matching, BM25 + hashed-embedding
+  fusion, passage citations, refusal below threshold, CLI and dashboard.
+- **Phase 4 (done):** grounded quizzes, adaptive difficulty, per-topic mastery and weakest-topic gaps,
+  persisted in SQLite.
+- **Phase 5 (in progress):** React dashboard with live captions, notes reader, Q&A and quiz views;
+  one-click Windows install; packaging and end-to-end verification on the low-end target machine.
 
 See `docs/architecture.md` for the contracts each phase must honour and `docs/roadmap.md` for the
 12-week plan from the Phase-I review.

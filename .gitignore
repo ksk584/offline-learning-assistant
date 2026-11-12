@@ -47,6 +47,9 @@ scratch/
 .env
 .env.local
 .data/
+*.sqlite3
+*.sqlite
+*.db
 
 # OS / Editor
 .vscode/

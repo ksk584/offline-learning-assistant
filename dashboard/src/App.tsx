@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createNotes, getConfig, getDemo, transcribeFile } from "./api";
+import { AskPane } from "./components/AskPane";
 import { CaptionPane } from "./components/CaptionPane";
 import { CurriculumPanel } from "./components/CurriculumPanel";
 import { NotesPane } from "./components/NotesPane";
 import { PdfNotesViewer } from "./components/PdfNotesViewer";
+import { QuizPane } from "./components/QuizPane";
+import { TeacherDashboard } from "./components/TeacherDashboard";
 import {
   BookIcon,
   CpuIcon,
@@ -15,7 +18,7 @@ import {
   WarningIcon,
 } from "./components/icons";
 import { formatDuration, messageOf } from "./format";
-import type { AppConfig, DemoLecture, NotesResult } from "./types";
+import type { AppConfig, DemoLecture, DemoLine, NotesResult } from "./types";
 import { useCaptions } from "./useCaptions";
 
 const PROFILE_LABELS: Record<string, string> = {
@@ -42,7 +45,7 @@ export function App() {
   const [markdown, setMarkdown] = useState("");
   const [notesLoading, setNotesLoading] = useState(false);
   const [notesError, setNotesError] = useState<string | null>(null);
-  const [mainView, setMainView] = useState<"pdf" | "capture">("pdf");
+  const [mainView, setMainView] = useState<"capture" | "ask" | "quiz" | "teacher" | "pdf">("capture");
   const [activeNcertUnit, setActiveNcertUnit] = useState<number>(1);
   const [uploading, setUploading] = useState(false);
   const [uploadInfo, setUploadInfo] = useState<string | null>(null);
@@ -299,6 +302,34 @@ export function App() {
 
   const busy = phase === "connecting" || phase === "loading" || phase === "live";
 
+  const lectureLines = useMemo<DemoLine[]>(
+    () =>
+      finals.map((line) => ({
+        text: line.text,
+        start: line.start,
+        end: line.end,
+      })),
+    [finals],
+  );
+
+  const subjectLabel = config?.curriculum.subject_labels[subject] ?? subject;
+  const course = useMemo(
+    () =>
+      config?.curriculum.courses.find(
+        (item) => item.class_level === classLevel && item.subject === subject,
+      ) ?? null,
+    [classLevel, config, subject],
+  );
+  const courseChapters = course?.chapters ?? [];
+  const demoHint = useMemo(() => {
+    if (demo) return demo.title;
+    return (
+      config?.curriculum.demos.find(
+        (item) => item.class_level === classLevel && item.subject === subject,
+      )?.title ?? `Class ${classLevel} ${subjectLabel} NCERT demo`
+    );
+  }, [classLevel, config, demo, subject, subjectLabel]);
+
   const sessionLabel = useMemo(() => {
     if (demoPlaying) return "Playing NCERT demo";
     if (uploading) return "Transcribing uploaded media";
@@ -343,7 +374,8 @@ export function App() {
             <p className="brand-eyebrow">SDG 4 · Team 9 · fully offline</p>
             <h1>Offline Lecture Assistant</h1>
             <p className="brand-sub">
-              Live captions, NCERT syllabus alignment and grounded notes — no cloud, no keys.
+              Live captions, grounded Q&amp;A, adaptive quizzes and NCERT notes — no cloud,
+              no keys.
             </p>
           </div>
         </div>
@@ -383,8 +415,9 @@ export function App() {
           display: "flex",
           gap: "10px",
           padding: "10px 24px",
-          background: "rgba(2, 4, 8, 0.9)",
-          borderBottom: "1px solid rgba(37, 99, 235, 0.2)",
+          background: "rgba(2, 4, 8, 0.95)",
+          borderBottom: "1px solid rgba(37, 99, 235, 0.25)",
+          flexWrap: "wrap",
         }}
       >
         <button
@@ -393,7 +426,31 @@ export function App() {
           style={{ padding: "8px 18px", fontSize: "0.88rem", fontWeight: 700 }}
           onClick={() => setMainView("capture")}
         >
-          🎙️ Live Lecture Capture & Transcribe
+          🎙️ Live Capture &amp; Notes
+        </button>
+        <button
+          type="button"
+          className={`btn ${mainView === "ask" ? "primary" : "ghost"}`}
+          style={{ padding: "8px 18px", fontSize: "0.88rem", fontWeight: 700 }}
+          onClick={() => setMainView("ask")}
+        >
+          💬 Syllabus Q&amp;A with Citations
+        </button>
+        <button
+          type="button"
+          className={`btn ${mainView === "quiz" ? "primary" : "ghost"}`}
+          style={{ padding: "8px 18px", fontSize: "0.88rem", fontWeight: 700 }}
+          onClick={() => setMainView("quiz")}
+        >
+          🎯 Adaptive Quizzes &amp; Auto-Remediation
+        </button>
+        <button
+          type="button"
+          className={`btn ${mainView === "teacher" ? "primary" : "ghost"}`}
+          style={{ padding: "8px 18px", fontSize: "0.88rem", fontWeight: 700 }}
+          onClick={() => setMainView("teacher")}
+        >
+          👩‍🏫 Teacher Analytics &amp; Gaps
         </button>
         <button
           type="button"
@@ -401,13 +458,42 @@ export function App() {
           style={{ padding: "8px 18px", fontSize: "0.88rem", fontWeight: 700 }}
           onClick={() => setMainView("pdf")}
         >
-          📑 NCERT 10-Page Master Notes (Full Document Reader)
+          📑 NCERT 10-Page Master Notes (Full Reader)
         </button>
       </div>
 
       {mainView === "pdf" ? (
         <div style={{ flex: 1, padding: "16px 24px", display: "flex", overflow: "hidden", minHeight: "calc(100vh - 160px)" }}>
           <PdfNotesViewer initialUnit={activeNcertUnit || 1} />
+        </div>
+      ) : mainView === "teacher" ? (
+        <div className="study-view" style={{ flex: 1, display: "flex" }}>
+          <TeacherDashboard />
+        </div>
+      ) : mainView === "ask" ? (
+        <div className="study-view">
+          <AskPane
+            classLevel={classLevel}
+            subject={subject}
+            subjectLabel={subjectLabel}
+            lines={lectureLines}
+            sourceHint={demoHint}
+            courseLabel={course?.label ?? null}
+            onSelectSubject={(s) => setSubject(s)}
+          />
+        </div>
+      ) : mainView === "quiz" ? (
+        <div className="study-view">
+          <QuizPane
+            classLevel={classLevel}
+            subject={subject}
+            subjectLabel={subjectLabel}
+            courseLabel={course?.label ?? null}
+            chapters={courseChapters}
+            lines={lectureLines}
+            sourceHint={demoHint}
+            onSelectSubject={(s) => setSubject(s)}
+          />
         </div>
       ) : (
         <div className="layout">

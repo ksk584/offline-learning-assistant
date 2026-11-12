@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Singular setup and runner for Offline Intelligent Learning Assistant (ILA).
     Works on any Windows device with Python 3.11+.
@@ -75,7 +75,7 @@ if ($UvCmd) {
     if (-not (Test-Path ".venv\Scripts\activate.ps1")) {
         & $PythonCmd -m venv .venv
     }
-    & ".venv\Scripts\python.exe" -m pip install -e ".[llm]" pypdf huggingface-hub
+    & ".venv\Scripts\python.exe" -m pip install -e ".[llm]" pypdf huggingface-hub scikit-learn
 }
 Write-Host "[✓] Dependencies installed." -ForegroundColor Green
 
@@ -140,3 +140,4 @@ if ($UvCmd) {
 } else {
     & ".venv\Scripts\ila.exe" serve --host 127.0.0.1 --port 8765
 }
+

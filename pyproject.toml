@@ -16,6 +16,7 @@ dependencies = [
     "pydantic-settings>=2.4",
     "pypdf>=5.0.0",
     "huggingface-hub>=0.23",
+    "scikit-learn>=1.4.0",
 ]
 
 [project.optional-dependencies]
@@ -39,6 +40,11 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# Prompt text and inline HTML/CSS are intentionally long, readable prose rather than code.
+"scripts/generate_ncert_notes.py" = ["E501"]
+"scripts/build_html_notes.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

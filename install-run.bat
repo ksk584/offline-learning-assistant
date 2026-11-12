@@ -117,7 +117,7 @@ if defined UV_CMD (
     if !errorlevel! neq 0 (
         echo [*] Running fallback dependency install via uv pip...
         !UV_CMD! venv .venv
-        !UV_CMD! pip install -e .[llm] pypdf huggingface-hub
+        !UV_CMD! pip install -e .[llm] pypdf huggingface-hub scikit-learn
     )
 ) else (
     if not exist ".venv\Scripts\activate.bat" (
@@ -125,7 +125,7 @@ if defined UV_CMD (
     )
     call .venv\Scripts\activate.bat
     python -m pip install --upgrade pip
-    pip install -e .[llm] pypdf huggingface-hub
+    pip install -e .[llm] pypdf huggingface-hub scikit-learn
 )
 
 echo [✓] Core dependencies and virtual environment ready.
@@ -204,3 +204,4 @@ if defined UV_CMD (
 )
 
 pause
+

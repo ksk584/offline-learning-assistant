@@ -36,46 +36,74 @@ instead of failing.
 232-token prompt at ~21 tok/s and peaks at ~1.95 GB RSS; the 0.8B model with 2 threads reaches
 ~30 tok/s at ~0.9 GB. See `docs/architecture.md` for the profile table and evaluation protocol.
 
-## Phase 3 — Syllabus retrieval and Q&A (weeks 7–8)
+## Phase 3 — Syllabus retrieval and Q&A (weeks 7–8) — done
 
-- Parse the course syllabus (PDF/docx) into `topics` with codes and descriptions.
-- Embed syllabus chunks and lecture notes with MiniLM (ONNX runtime, CPU) into FAISS.
-- Hybrid retrieval: dense (FAISS) + lexical (BM25) with score fusion; cosine threshold tuning.
-- Q&A: retrieve → answer with a small local model or extractive answer span; always cite sources.
-- API: `POST /api/ask {session_id?, topic_code?, question}`.
+- [x] Parse the NCERT catalogue into six courses (Class 8–10 Science and Mathematics) with chapter
+      titles, keywords and transcript matching (`curriculum.py`).
+- [x] Build passages from finals, generated notes and syllabus cards with chapter/timestamp
+      provenance (`retrieval.py`).
+- [x] Hybrid retrieval: BM25 + 384-dim hashed lexical embeddings with score fusion and term coverage.
+      Chosen over MiniLM/FAISS to keep the install offline and CPU-only; the embedder interface is
+      swappable for ONNX later.
+- [x] Q&A: extractive answer quoted from the top passage, always cited; a hard `min_score` gate
+      refuses unrelated questions. Optional local-LLM rewrite is accepted only when its content words
+      are supported by the retrieved excerpt.
+- [x] API: `POST /api/ask` with transcript/session/demo fallback; CLI `ila ask`; dashboard Q&A tab.
 
-**Acceptance:** 20-question evaluation set; ≥80% of answers cite the correct syllabus topic; no
-answer without a retrieved source above the confidence threshold.
+**Acceptance met:** the 20-question set across all six demos cites the expected NCERT chapter
+**20/20** (target ≥ 80%), and off-syllabus questions return no citations instead of an answer.
 
-## Phase 4 — Quizzes and adaptive remediation (weeks 9–10)
+## Phase 4 — Quizzes and adaptive remediation (weeks 9–10) — done
 
-- Question bank seeded from topics + notes (MCQ + short answer), stored in `questions`.
-- Quiz session flow with local attempts log (correctness, attempts, response time, difficulty).
-- Topic-wise mastery estimate; decision tree / logistic regression over the attempt features.
-- Adaptive difficulty + targeted practice generation for weak topics.
-- API: `POST /api/quiz/start`, `POST /api/quiz/answer`, `GET /api/students/{id}/gaps`.
+- [x] Deterministic question bank seeded from lecture definitions, cloze sentences and short answers;
+      master notes only top up a short bank. No invented content (`quiz.py`).
+- [x] Quiz session flow with an append-only attempts log (correctness, response time, difficulty).
+- [x] Topic-wise mastery via an explainable bounded EMA per `(student, topic)`; chosen over a
+      decision tree/logistic regression so the update is inspectable and needs no training data.
+- [x] Adaptive difficulty recomputed after every answer; `gaps` returns the three weakest topics with
+      a recommended practice difficulty.
+- [x] API: `POST /api/quiz/start`, `POST /api/quiz/answer`, `GET /api/students/{id}/gaps`; CLI
+      `ila quiz`; dashboard quiz tab; SQLite persistence.
 
-**Acceptance:** mastery estimates change in the expected direction on a scripted answer pattern;
-quiz difficulty adapts; teacher view lists the three weakest topics per student.
+**Acceptance met:** an all-correct scripted run raises mastery ≈ 0.50 → ≈ 0.98 with difficulty
+2 → 3; an all-wrong run lowers mastery and eases difficulty to 1; `gaps` lists the three weakest
+topics per student.
 
-## Phase 5 — Dashboard and packaging (weeks 11–12)
+## Phase 5 — Dashboard and packaging (weeks 11–12) — in progress
 
-- React + Vite dashboard: live caption pane (WebSocket), session list, notes viewer, Q&A panel,
-  quiz builder, class-level gap heatmap.
-- End-to-end test on the low-end target machine, fully offline.
-- Installer/packaging: one command to launch backend + bundled frontend; model prefetch script.
-- Report, demo script, and journal paper draft (Scopus submission per the review plan).
+- [x] React + Vite dashboard: live caption pane (WebSocket), demo replay, upload, notes viewer and
+      NCERT master-notes reader.
+- [x] Q&A panel (citations, refusal state, confidence) and quiz panel (setup, MCQ/short answer,
+      mastery bars, weakest topics).
+- [x] One-click Windows launcher (`install-run.bat` / `install-run.ps1`) plus `ila serve` for the
+      built dashboard and API.
+- [x] REST + config metadata for retrieval, quiz and storage; dashboard auto-falls back to the
+      selected NCERT demo when no live transcript exists.
+- [ ] End-to-end timing on the low-end target machine, fully offline.
+- [ ] Class-level gap heatmap and a session replay view.
+- [ ] Report, demo script, and journal paper draft (Scopus submission per the review plan).
 
 **Acceptance:** cold start to first caption under 30 s on the target machine with no network, and a
 complete teacher workflow demo without a terminal.
 
+## Verification snapshot
+
+* `uv run --extra dev python -m pytest -q` — **132 tests pass** (segmentation, pipeline, notes,
+  retrieval, quiz, storage and server include Q&A/quiz/multi-user coverage).
+* `uv run --extra dev ruff check .` — clean.
+* `npm run build` in `dashboard/` — clean TypeScript build.
+* Live server smoke test: demo and transcript Q&A, refusal, quiz start/answer, mastery update, gaps,
+  and dashboard HTML/JS/CSS all return 200.
+
 ## Immediate next actions
 
-1. Record a 10-minute lecture with the intended microphone; run
-   `ila transcribe lecture.wav --out events.jsonl`.
-2. Hand-correct that clip for a WER baseline (`base.en` vs `small.en`).
-3. Run `ila notes events.jsonl` and score the result with the note rubric in
-   `docs/architecture.md`; record the verifier drop rate and the fallback frequency.
-4. Decide the Phase 2 SQLite schema details with the team (session boundaries, course ids).
-5. Set up the React app (`npm create vite@latest dashboard -- --template react-ts`) against
-   `/ws/captions` with mock data first.
+1. Install on the low-end target machine and record cold start → first caption, plus peak RSS while
+   Whisper, notes and the quiz run.
+2. Record a 10-minute lecture with the intended microphone; hand-correct it for a WER baseline
+   (`base.en` vs `small.en`) and add the result to `docs/architecture.md`.
+3. Run `ila notes`, `ila ask` and `ila quiz` on that clip; score notes with the rubric and record the
+   verifier drop rate and fallback frequency.
+4. Add the class-level gap heatmap and a saved-session replay view to the dashboard.
+5. Expand the generated master notes beyond Class 10 Maths Units 1–3 so quiz banks have a wider
+   grounded pool.
+6. Draft the report/demo script and the Scopus paper from the evaluation tables.

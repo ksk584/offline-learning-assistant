@@ -15,7 +15,6 @@ import argparse
 import sys
 import time
 from pathlib import Path
-from typing import Any
 
 from ila.config import LlmSettings
 from ila.llm.llama_cpp import LlamaCppProvider
@@ -546,7 +545,7 @@ def generate_unit_notes(
     book_excerpt = ""
     if text_path.exists():
         raw_text = text_path.read_text(encoding="utf-8")
-        book_excerpt = raw_text[:3000]  # First 3000 chars as grounding seed
+        book_excerpt = raw_text[:3000]  # noqa: F841 - kept as a grounding seed for future prompts
 
     for idx, sec in enumerate(unit_info["sections"], 1):
         sec_id = sec["id"]

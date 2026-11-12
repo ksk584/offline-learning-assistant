@@ -2,8 +2,18 @@
 
 ## Goal
 
-A single offline pipeline that turns a lecture into structured study material. Phase 1 ends at the
-caption event stream; every later phase consumes that stream rather than re-processing audio.
+A single offline pipeline that turns a lecture into structured study material. The caption event
+stream is the only audio-dependent stage; notes, Q&A and quizzes all consume its text rather than
+re-processing audio.
+
+```text
+audio ──▶ caption events ──┬──▶ grounded notes ──┐
+                           ├──▶ knowledge base ──┼──▶ Q&A  (citations or refusal)
+                           └──▶ question bank ───┘──▶ quiz (EMA mastery + gaps)
+                                                        │
+                                                        ▼
+                                             SQLite ──▶ REST ──▶ React dashboard
+```
 
 ```text
                    ┌──────────────────────────────────────────────┐
@@ -137,6 +147,78 @@ will be slower, but the 0.8B model leaves headroom for the OS, the browser and W
 the notes pipeline sends at most a few hundred prompt tokens per chunk and stops at the time budget,
 so this table bounds one call, not a whole lecture.
 
+## Syllabus retrieval and Q&A
+
+The roadmap originally called for MiniLM + FAISS + BM25. FAISS and a sentence-transformer are the
+right tools when a GPU and a model download are acceptable, but they are a poor fit for a classroom
+PC that must install once and then never touch the network. `retrieval.py` therefore keeps the same
+*shape* — lexical + vector fusion with a score gate — using only the standard library. The
+embedding interface is a plain `dict[int, float]`, so a real ONNX MiniLM embedder can replace
+`hashed_embedding` without changing the Q&A or quiz code.
+
+| Stage | Behaviour |
+| --- | --- |
+| Passages | Each final utterance, generated notes chunk and NCERT syllabus card becomes a `Passage` with chapter, timestamp and keyword provenance |
+| Chunking | Notes are split at sentence boundaries into overlapping ≤ 900-character chunks (120-character tail) so a definition split across pages is still findable |
+| Lexical score | Okapi BM25 (`k1` 1.4, `b` 0.72) over a small English stemmer with a stopword list |
+| Vector score | Signed feature hashing over words, bigrams and character trigrams into 384 dimensions, L2-normalised, compared with cosine similarity — no model, no download |
+| Fusion | `0.58 · normalized_BM25 + 0.42 · cosine + 0.10 · query-term coverage`, plus a 0.12 exact-phrase bonus |
+| Source weights | Syllabus cards × 0.72 (they cite, they should not outrank lecture text); notes × 0.96 |
+| Gate | The top passage must score ≥ 0.16; otherwise the engine returns a refusal with zero citations |
+| Answer | The best supporting sentence(s) are extracted and quoted, at most ~360 characters or two sentences. `content_only=True` prevents a syllabus card from being quoted as an answer |
+| Optional rewrite | A local LLM may compose the answer, but every content word must appear in the retrieved excerpt or the extractive answer is used instead (`llm+verified` vs `extractive`) |
+
+Answer payloads carry the answer, `answerable`, `confidence`, up to three citations (chapter,
+timestamp, score, snippet), the matched topics and the retrieval latency. Because the answer is a
+quote, a hallucination would have to survive both the score gate and the sentence-overlap check.
+
+### Acceptance evidence
+
+* 20 questions spanning all six demos: **20/20** cite the expected NCERT chapter.
+* Off-syllabus questions ("Who won the 2011 cricket World Cup?", "How do you bake a chocolate
+  cake?") return `answerable=false` with no citations.
+* The gate is a single tunable (`min_score`, default 0.16); raising it trades coverage for precision.
+
+## Adaptive quizzes
+
+`quiz.py` builds a question bank deterministically from grounded passages — no generative model and
+no invented content.
+
+| Kind | Source | Grading |
+| --- | --- | --- |
+| Definition MCQ | A passage of the form "X is/are/means Y"; three distractors are chosen from other grounded terms | `answer_index` or option text |
+| Cloze MCQ | A lecture sentence with one keyword removed and blanked | `answer_index` or option text |
+| Short answer | The definition/predicate after "is/are/means" | Content-word recall ≥ 0.6, F1 ≥ 0.6, or keyword overlap ≥ 0.5 |
+
+Lecture passages are used first; master notes only top up a bank smaller than ten items, because
+dense reference notes yield less natural cloze items. Noisy headings, formula-only fragments,
+Greek-letter placeholders and Markdown boilerplate are filtered before a question is emitted.
+
+### Mastery and adaptivity
+
+Mastery is an explainable bounded exponential moving average per `(student, topic)`, not a trained
+classifier:
+
+```text
+step    = 0.30 + 0.10 · (difficulty − 1)      # 0.30 / 0.40 / 0.50
+step   += 0.05                                # correct and response ≤ 12 s
+mastery = clamp(mastery + step · (target − mastery), 0.02, 0.99)
+target  = 1.0 if correct else 0.0
+```
+
+Unseen topics start at 0.5. Mastery maps to the next target difficulty (`< 0.36` → 1, `< 0.66` →
+2, otherwise 3), so a correct streak raises difficulty and a wrong streak eases it. A quiz starts at
+the difficulty implied by the student's average mastery, or at a teacher-supplied override.
+`gaps(student_id)` returns the three lowest-mastery topics with a recommended practice difficulty;
+this is the teacher view.
+
+### Acceptance evidence
+
+* All-correct scripted run: mastery ≈ 0.50 → ≈ 0.98 and difficulty 2 → 3.
+* All-wrong run: mastery falls below 0.50, difficulty eases to 1, and the weakest-topic list updates.
+* A 12-line Class 10 Maths demo yields 14 grounded questions (definition, cloze and short answer).
+* Answer responses expose mastery consistently as `mastery` across start, answer and gaps payloads.
+
 ## Latency budget (CPU, int8 base.en)
 
 | Stage | Target | Notes |
@@ -164,18 +246,56 @@ last 1.5 s, which empirically lands between words.
   `loop.call_soon_threadsafe` and a queue. `stop` is a `threading.Event` checked between blocks, so
   shutdown is bounded by one 40 ms block plus the current inference.
 
-## Storage (phase 2+)
+## Storage
 
-SQLite, one file per installation under `ILA_HOME/data/ila.db`:
+One SQLite file per installation at `ILA_DATA_DIR/ila.sqlite3` (`ILA_HOME/data` by default), using
+the standard-library `sqlite3` driver with WAL journaling and foreign keys enabled. Every method
+opens a short-lived connection so FastAPI's thread pool never shares a connection. There is no ORM
+and no migration framework; `SCHEMA` is applied idempotently with `CREATE TABLE IF NOT EXISTS`.
 
 ```sql
-sessions(id, title, course, started_at, ended_at, model)
-utterances(id, session_id, start_s, end_s, text, avg_logprob, no_speech_prob)
-notes(id, session_id, kind, content, created_at)          -- phase 2
-topics(id, course_id, code, title, syllabus_text)          -- phase 3
-questions(id, topic_id, text, options_json, answer, difficulty, source)  -- phase 4
-attempts(id, question_id, student_id, correct, response_ms, created_at)  -- phase 4
+sessions(id TEXT PK, created_at, title, class_level, subject, duration_s,
+         transcript, notes_json, markdown)
+utterances(id INTEGER PK, session_id → sessions ON DELETE CASCADE, idx, text, start, end)
+notes(session_id TEXT PK → sessions ON DELETE CASCADE, markdown, notes_json, updated_at)
+
+quiz_sessions(id TEXT PK, student_id, class_level, subject, topic,
+              created_at, updated_at, completed, score, state_json)
+quiz_attempts(id INTEGER PK, quiz_id, student_id, question_id, topic, difficulty,
+              prompt, expected, response, correct, response_ms, created_at)
+mastery(student_id, topic, attempts, correct, score REAL DEFAULT 0.5,
+        updated_at, PRIMARY KEY (student_id, topic))
 ```
+
+`quiz_sessions.state_json` is the resumable quiz state: the full graded question records, the current
+question id, remaining ids, counters and target difficulty. `quiz_attempts` is the append-only audit
+log used for reporting. Indexes cover utterances by session, attempts by student/date and quiz, and
+mastery by student/score.
+
+## API contract
+
+The React dashboard talks only to the local FastAPI server. Request models are Pydantic; the
+TypeScript mirrors live in `dashboard/src/types.ts`.
+
+| Endpoint | Request → response |
+| --- | --- |
+| `POST /api/ask` | `{question, lines?, text?, session_id?, class_level?, subject?, top_k?, min_score?, use_llm?}` → answer + `source` + `course` + `chapter_matches` |
+| `POST /api/quiz/start` | `{student_id?, class_level?, subject?, topic?, length?, difficulty?, lines?, text?, session_id?}` → `quiz_id`, first `question`, `progress`, `mastery`, `source`, available `topics` |
+| `POST /api/quiz/answer` | `{quiz_id, question_id, answer?, answer_index?, response_ms?}` → `correct`, `expected`, `feedback`, `explanation`, updated `mastery`, `progress`, `next_question`, `target_difficulty`, `gaps` |
+| `GET /api/students/{id}/gaps` | query `limit` → `{gaps, attempts, overall}` with the weakest topics and recommended difficulty |
+| `POST /api/sessions` | `{title, lines?, text?, class_level?, subject?, duration_s?, notes?, markdown?}` → saved session |
+| `GET /api/sessions`, `GET /api/sessions/{id}` | list or hydrate persisted sessions |
+| `GET /api/config` | ASR/notes/retrieval/quiz/storage metadata plus the curriculum catalogue |
+
+Q&A and quiz requests resolve their source in this order: explicit `lines` → saved `session_id` →
+`text` → the built-in NCERT demo for the selected course. That is what lets the dashboard demo the
+whole loop with no live microphone, and it is reported back as `source.kind`
+(`transcript` / `session` / `demo`). A quiz request with no grounded questions returns HTTP 400 with
+an actionable message rather than an empty quiz.
+
+WebSocket `/ws/captions` keeps the phase-1 contract: client sends a config object, server emits
+`status` → `ready` → `caption`* → `done` (or `error`). Restricting the server to `127.0.0.1` and the
+local Vite origin is unchanged.
 
 ## Evaluation (report-ready)
 
@@ -192,6 +312,13 @@ attempts(id, question_id, student_id, correct, response_ms, created_at)  -- phas
    verifier. Also report how often the extractive fallback triggered and why.
 6. **Note helpfulness** — a small rubric (1–5) scored by two team members on the same three clips:
    coverage of the main ideas, correctness, and whether the timestamps land on the cited sentence.
+7. **Q&A grounding** — a 20-question set across all six demos: percentage of answers that cite the
+   expected NCERT chapter (target ≥ 80%; current **20/20**) and the refusal rate on off-syllabus
+   questions (target: refuse all, current: all). Report retrieval latency and `min_score` alongside.
+8. **Quiz adaptivity** — a scripted all-correct and all-wrong answer pattern: direction of the
+   mastery change, difficulty transitions, and whether `gaps` surfaces the three weakest topics.
+   Report the number of grounded questions generated per demo and the grading accuracy on a small
+   hand-labelled set of short answers.
 
 Instrumentation already available: every run prints utterances, audio seconds, wall time and
 realtime factor; `--out` writes JSONL with per-event latency and confidence.
@@ -203,4 +330,7 @@ realtime factor; `--out` writes JSONL with per-event latency and confidence.
   code path that can touch the network.
 * No telemetry, no remote calls at runtime; `faster-whisper` uses only local CTranslate2 inference
   and `llama.cpp` uses only local CPU inference.
+* Retrieval uses only the standard library (BM25 + hashed embeddings); there is no FAISS index, no
+  MiniLM download and no scikit-learn model to provision.
+* Persistence is a single SQLite file under `ILA_DATA_DIR`; no database service is installed or run.
 * The server binds to `127.0.0.1` by default and only allows the local Vite origin.

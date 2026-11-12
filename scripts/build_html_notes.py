@@ -3,7 +3,7 @@ with KaTeX math rendering, floating table of contents, and print styling.
 """
 
 from __future__ import annotations
-import re
+
 from pathlib import Path
 
 NOTES_DIR = Path("notes")
