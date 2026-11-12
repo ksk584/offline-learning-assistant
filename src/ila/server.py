@@ -757,9 +757,42 @@ def get_ncert_note(unit: int) -> dict[str, Any]:
 async def create_notes(request: NotesRequest) -> dict[str, Any]:
     lines = _request_lines(request)
     class_level, subject = _selection(request.class_level, request.subject)
-    syllabus = _syllabus_for(lines, class_level, subject) if request.use_syllabus else None
     settings = _request_settings(request)
     title = request.title.strip() or "Lecture notes"
+
+    syllabus = None
+    mapped_topic = None
+    chapter_number = None
+    correlation_score = 0.0
+    matched_terms: list[str] = []
+
+    if request.use_syllabus:
+        syllabus = _syllabus_for(lines, class_level, subject)
+        if not syllabus or not getattr(syllabus, "matches", None) or len(syllabus.matches) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"No syllabus correlation found: The transcript does not correlate with any "
+                    f"NCERT Class {class_level} {subject.capitalize()} topic. Grounded notes dropped. "
+                    f"Please capture a lecture covering syllabus topics (e.g. Real Numbers, Polynomials, Linear Equations, Quadratic Equations)."
+                ),
+            )
+        top_match = syllabus.matches[0]
+        if top_match.score < 1.5:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Insufficient syllabus correlation (score {top_match.score:.1f} < 1.5): "
+                    f"The transcript has too little correlation with '{top_match.chapter.title}'. "
+                    f"Grounded notes dropped. Please provide more subject-specific lecture content."
+                ),
+            )
+        mapped_topic = top_match.chapter.title
+        chapter_number = top_match.chapter.number
+        correlation_score = top_match.score
+        matched_terms = list(top_match.matched_terms)
+        title = f"{mapped_topic} (Class {class_level} {subject.capitalize()})"
+
     try:
         result = await asyncio.to_thread(
             _generate_notes_sync,
@@ -774,7 +807,54 @@ async def create_notes(request: NotesRequest) -> dict[str, Any]:
     except Exception as exc:
         logger.exception("note generation failed")
         raise HTTPException(status_code=500, detail=f"Note generation failed: {exc}") from exc
-    return {"notes": result.to_dict(), "markdown": result.to_markdown()}
+
+    # Store notes along with mapped topic in SQLite storage
+    transcript_text = " ".join(line.text for line in lines)
+    duration_s = max(0.0, (lines[-1].end or 0.0) - (lines[0].start or 0.0)) if lines else 0.0
+    session_id = _store().save_session(
+        title=title,
+        class_level=class_level,
+        subject=subject,
+        lines=[line.to_dict() for line in lines],
+        transcript=transcript_text,
+        duration_s=duration_s,
+        notes=result.to_dict(),
+        markdown=result.to_markdown(),
+        topic=mapped_topic,
+        chapter_number=chapter_number,
+    )
+
+    return {
+        "notes": result.to_dict(),
+        "markdown": result.to_markdown(),
+        "mapped_topic": mapped_topic,
+        "chapter_number": chapter_number,
+        "correlation_score": round(correlation_score, 2),
+        "matched_terms": matched_terms,
+        "session_id": session_id,
+    }
+
+
+@app.get("/api/lecture-notes/{chapter_number}")
+def get_lecture_notes_for_unit(
+    chapter_number: int,
+    class_level: int = 10,
+    subject: str = "maths",
+) -> dict[str, Any]:
+    level, name = _selection(class_level, subject)
+    session = _store().get_notes_by_chapter(chapter_number, class_level=level, subject=name)
+    if not session:
+        return {"found": False, "notes": None, "markdown": None}
+    return {
+        "found": True,
+        "session_id": session["id"],
+        "title": session["title"],
+        "topic": session.get("topic"),
+        "chapter_number": session.get("chapter_number"),
+        "markdown": session.get("markdown"),
+        "notes": session.get("notes"),
+        "created_at": session.get("created_at"),
+    }
 
 
 @app.post("/api/transcribe")

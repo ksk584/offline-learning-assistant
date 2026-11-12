@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Singular setup and runner for Offline Intelligent Learning Assistant (ILA).
     Works on any Windows device with Python 3.11+.

@@ -1,16 +1,27 @@
 import { useEffect, useRef } from "react";
 import type { CaptionLine, CaptionPhase } from "../types";
 import { formatDuration, formatTime } from "../format";
-import { MicIcon, TrashIcon } from "./icons";
+import { MicIcon, SparkIcon, TrashIcon } from "./icons";
 
 interface CaptionPaneProps {
   finals: CaptionLine[];
   partial: CaptionLine | null;
   phase: CaptionPhase;
   onClear: () => void;
+  onGenerate?: () => void;
+  generatingNotes?: boolean;
+  hasNotes?: boolean;
 }
 
-export function CaptionPane({ finals, partial, phase, onClear }: CaptionPaneProps) {
+export function CaptionPane({
+  finals,
+  partial,
+  phase,
+  onClear,
+  onGenerate,
+  generatingNotes = false,
+  hasNotes = false,
+}: CaptionPaneProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const active = phase === "live" || phase === "loading" || phase === "connecting";
   const duration = finals.length ? finals[finals.length - 1].end : 0;
@@ -45,6 +56,18 @@ export function CaptionPane({ finals, partial, phase, onClear }: CaptionPaneProp
           <h2>Live transcript</h2>
         </div>
         <div className="panel-actions">
+          {finals.length > 0 && onGenerate && (
+            <button
+              type="button"
+              className="btn primary compact caption-convert-btn"
+              onClick={onGenerate}
+              disabled={generatingNotes}
+              title="Convert transcript to NCERT grounded notes"
+            >
+              <SparkIcon />
+              <span>{generatingNotes ? "Writing…" : hasNotes ? "Update Notes" : "Convert to Notes"}</span>
+            </button>
+          )}
           <span className={`stream-state ${active ? "active" : ""}`}>
             <span className="stream-dot" />
             {active ? "capturing" : phase === "done" ? "ended" : "idle"}
@@ -102,13 +125,28 @@ export function CaptionPane({ finals, partial, phase, onClear }: CaptionPaneProp
       </div>
 
       <footer className="caption-footer">
-        <span>
-          <strong>{finals.length}</strong> utterance{finals.length === 1 ? "" : "s"}
-        </span>
-        <span>
-          <strong>{formatDuration(duration)}</strong> captured
-        </span>
-        <span className="footer-note">finals only → notes</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <span>
+            <strong>{finals.length}</strong> utterance{finals.length === 1 ? "" : "s"}
+          </span>
+          <span>
+            <strong>{formatDuration(duration)}</strong> captured
+          </span>
+        </div>
+        {finals.length > 0 && onGenerate ? (
+          <button
+            type="button"
+            className="caption-convert-pill"
+            onClick={onGenerate}
+            disabled={generatingNotes}
+            title="Convert this transcript into structured notes"
+          >
+            <SparkIcon />
+            <span>{generatingNotes ? "Writing…" : "✨ Convert to Notes"}</span>
+          </button>
+        ) : (
+          <span className="footer-note">finals only → notes</span>
+        )}
       </footer>
     </section>
   );

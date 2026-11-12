@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { getNcertUnitNote } from "../api";
-import type { NcertNoteDetail, NcertPage, NotesResult } from "../types";
+import { getNcertUnitNote, getStoredLectureNotes } from "../api";
+import type { NcertNoteDetail, NcertPage, NotesResult, StoredLectureNotesResponse } from "../types";
 import {
   BookIcon,
   CheckIcon,
@@ -20,11 +20,18 @@ interface NotesPaneProps {
   loading: boolean;
   error: string | null;
   hasLines: boolean;
+  finalsCount?: number;
   onGenerate: () => void;
   onSelectNcertUnit?: (unit: number) => void;
   activeNcertUnit?: number | null;
   onStartMic?: () => void;
   onPlayDemo?: () => void;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
+  mappedTopic?: string | null;
+  chapterNumber?: number | null;
+  classLevel?: number;
+  subject?: string;
 }
 
 const UNITS = [
@@ -72,17 +79,25 @@ export function NotesPane({
   loading: transcriptLoading,
   error: transcriptError,
   hasLines,
+  finalsCount = 0,
   onGenerate,
   onSelectNcertUnit,
   activeNcertUnit = 1,
   onStartMic,
   onPlayDemo,
+  isExpanded = false,
+  onToggleExpand,
+  mappedTopic = null,
+  chapterNumber = null,
+  classLevel = 10,
+  subject = "maths",
 }: NotesPaneProps) {
   const [selectedUnit, setSelectedUnit] = useState<number>(activeNcertUnit || 1);
   const [activeTab, setActiveTab] = useState<"textbook" | "transcript" | "both">("textbook");
   const [textbookData, setTextbookData] = useState<NcertNoteDetail | null>(null);
   const [textbookLoading, setTextbookLoading] = useState<boolean>(true);
   const [textbookError, setTextbookError] = useState<string | null>(null);
+  const [storedLectureNote, setStoredLectureNote] = useState<StoredLectureNotesResponse | null>(null);
   const [selectedPage, setSelectedPage] = useState<"all" | number>("all");
   const [copied, setCopied] = useState<boolean>(false);
 
@@ -121,6 +136,26 @@ export function NotesPane({
     };
   }, [selectedUnit]);
 
+  // Load Stored Lecture Notes from SQLite for selected unit
+  useEffect(() => {
+    let active = true;
+    getStoredLectureNotes(selectedUnit, classLevel, subject)
+      .then((res) => {
+        if (active && res.found) {
+          setStoredLectureNote(res);
+        } else if (active) {
+          setStoredLectureNote(null);
+        }
+      })
+      .catch(() => {
+        if (active) setStoredLectureNote(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [selectedUnit, classLevel, subject, notes]);
+
   // KaTeX rendering hook
   useEffect(() => {
     if (!textbookLoading && typeof window !== "undefined") {
@@ -144,20 +179,24 @@ export function NotesPane({
       }, 120);
       return () => clearTimeout(timer);
     }
-  }, [textbookLoading, textbookData, selectedPage, activeTab, markdown]);
+  }, [textbookLoading, textbookData, selectedPage, activeTab, markdown, storedLectureNote]);
 
   const handleUnitClick = (unitId: number) => {
     setSelectedUnit(unitId);
     onSelectNcertUnit?.(unitId);
   };
 
+  const currentMarkdown =
+    markdown ||
+    (storedLectureNote?.found && storedLectureNote.markdown ? storedLectureNote.markdown : "");
+
   const handleCopyCurrent = async () => {
     const textToCopy =
       activeTab === "transcript"
-        ? markdown
+        ? currentMarkdown
         : activeTab === "textbook"
           ? textbookData?.markdown || ""
-          : `--- LECTURE TRANSCRIPT NOTES ---\n\n${markdown}\n\n--- TEXTBOOK MASTER NOTES ---\n\n${textbookData?.markdown || ""}`;
+          : `--- LECTURE TRANSCRIPT NOTES ---\n\n${currentMarkdown}\n\n--- TEXTBOOK MASTER NOTES ---\n\n${textbookData?.markdown || ""}`;
     if (!textToCopy) return;
     await copyText(textToCopy);
     setCopied(true);
@@ -167,10 +206,10 @@ export function NotesPane({
   const handleDownloadCurrent = () => {
     const isTranscript = activeTab === "transcript";
     const textToDownload = isTranscript
-      ? markdown
+      ? currentMarkdown
       : activeTab === "textbook"
         ? textbookData?.markdown || ""
-        : `# Unit ${selectedUnit} Combined Notes\n\n## Lecture Transcript Notes\n\n${markdown}\n\n## NCERT 10-Page Master Guide\n\n${textbookData?.markdown || ""}`;
+        : `# Unit ${selectedUnit} Combined Notes\n\n## Lecture Transcript Notes\n\n${currentMarkdown}\n\n## NCERT 10-Page Master Guide\n\n${textbookData?.markdown || ""}`;
     if (!textToDownload) return;
     const blob = new Blob([textToDownload], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -195,6 +234,18 @@ export function NotesPane({
           <h2>Study Notes &amp; Textbook Guides</h2>
         </div>
         <div className="panel-actions">
+          {onToggleExpand && (
+            <button
+              type="button"
+              className={`icon-btn expand-notes-btn ${isExpanded ? "active" : ""}`}
+              onClick={onToggleExpand}
+              title={isExpanded ? "Collapse notes panel (3-column view)" : "Expand notes panel (Full width study mode)"}
+              aria-label={isExpanded ? "Collapse notes" : "Expand notes"}
+            >
+              <span className="expand-icon">{isExpanded ? "⤓" : "⛶"}</span>
+              <span className="expand-text">{isExpanded ? "Collapse" : "Expand"}</span>
+            </button>
+          )}
           <button
             type="button"
             className="icon-btn"
@@ -222,15 +273,16 @@ export function NotesPane({
           >
             🖨️
           </button>
-          {activeTab === "transcript" && (
+          {hasLines && (
             <button
               type="button"
-              className="btn primary compact"
+              className="btn primary compact generate-notes-btn"
               onClick={onGenerate}
-              disabled={!hasLines || transcriptLoading}
+              disabled={transcriptLoading}
+              title="Convert live transcript to grounded NCERT notes"
             >
               <SparkIcon />
-              {transcriptLoading ? "Writing…" : notes ? "Regenerate" : "Generate notes"}
+              <span>{transcriptLoading ? "Writing…" : notes ? "Regenerate" : "Convert transcript"}</span>
             </button>
           )}
         </div>
@@ -287,8 +339,10 @@ export function NotesPane({
         >
           <MicIcon />
           <span>🎙️ Lecture Transcript Notes</span>
-          {notes ? (
+          {notes || storedLectureNote?.found ? (
             <span className="tab-pill-badge ready">Captured</span>
+          ) : hasLines ? (
+            <span className="tab-pill-badge ready">Ready</span>
           ) : (
             <span className="tab-pill-badge idle">Session</span>
           )}
@@ -417,17 +471,36 @@ export function NotesPane({
                   <strong>Synthesizing lecture notes…</strong>
                   <p>
                     TextRank extracts core utterances, local LLM rewrites them, and the
-                    grounding verifier ensures zero hallucinations.
+                    syllabus correlation verifier grounds notes to NCERT topics.
                   </p>
                 </div>
               </div>
             ) : transcriptError ? (
-              <div className="inline-warning error">
-                <WarningIcon />
-                <span>{transcriptError}</span>
+              <div className="transcript-correlation-error-card">
+                <div className="error-card-header">
+                  <WarningIcon />
+                  <strong>Syllabus Correlation Error · Notes Dropped</strong>
+                </div>
+                <p className="error-card-message">{transcriptError}</p>
+                <div className="error-card-help">
+                  <span>💡 The lecture transcript was evaluated against NCERT syllabus topics. Off-topic talk or transcripts with insufficient correlation are rejected to protect grounded learning materials.</span>
+                </div>
               </div>
             ) : notes && markdown ? (
               <div className="transcript-notes-content">
+                {mappedTopic && (
+                  <div className="mapped-topic-banner">
+                    <div className="mapped-topic-info">
+                      <span className="mapped-topic-pill">Unit {chapterNumber ?? selectedUnit}</span>
+                      <div>
+                        <strong>Mapped Syllabus Chapter: {mappedTopic}</strong>
+                        <p>Verified against NCERT syllabus · Stored in SQLite database</p>
+                      </div>
+                    </div>
+                    <span className="mapped-topic-badge">✓ Stored in SQLite</span>
+                  </div>
+                )}
+
                 <div className="notes-meta">
                   <span className={`chip ${notes.used_llm ? "chip-accent" : "chip-muted"}`}>
                     {notes.used_llm ? <SparkIcon /> : null}
@@ -456,6 +529,44 @@ export function NotesPane({
 
                 <div className="markdown transcript-markdown">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
+                </div>
+              </div>
+            ) : storedLectureNote?.found && storedLectureNote.markdown ? (
+              <div className="transcript-notes-content">
+                <div className="mapped-topic-banner stored-history">
+                  <div className="mapped-topic-info">
+                    <span className="mapped-topic-pill">Unit {storedLectureNote.chapter_number ?? selectedUnit}</span>
+                    <div>
+                      <strong>Stored Lecture Notes: {storedLectureNote.topic ?? storedLectureNote.title}</strong>
+                      <p>Retrieved from SQLite database ({storedLectureNote.created_at ? new Date(storedLectureNote.created_at).toLocaleDateString() : "Saved Lecture"})</p>
+                    </div>
+                  </div>
+                  <span className="mapped-topic-badge stored">💾 Stored in SQLite</span>
+                </div>
+
+                <div className="markdown transcript-markdown">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{storedLectureNote.markdown}</ReactMarkdown>
+                </div>
+              </div>
+            ) : hasLines ? (
+              <div className="transcript-convert-prompt-card">
+                <div className="prompt-card-icon">
+                  <SparkIcon />
+                </div>
+                <div className="prompt-card-body">
+                  <h3>Live Lecture Transcript Ready for Conversion</h3>
+                  <p>
+                    {finalsCount > 0 ? `${finalsCount} speech utterances` : "Captured lecture utterances"} ready to synthesize into structured, syllabus-grounded notes mapped to NCERT units.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn primary"
+                    onClick={onGenerate}
+                    disabled={transcriptLoading}
+                  >
+                    <SparkIcon />
+                    {transcriptLoading ? "Writing Notes with Local LLM…" : "Convert Transcript to Notes"}
+                  </button>
                 </div>
               </div>
             ) : (

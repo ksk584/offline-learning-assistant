@@ -27,7 +27,9 @@ CREATE TABLE IF NOT EXISTS sessions (
     duration_s REAL,
     transcript TEXT NOT NULL DEFAULT '',
     notes_json TEXT,
-    markdown TEXT
+    markdown TEXT,
+    topic TEXT,
+    chapter_number INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS utterances (
@@ -132,6 +134,11 @@ class Storage:
     def _init(self) -> None:
         with self._connection() as connection:
             connection.executescript(SCHEMA)
+            for col, col_type in [("topic", "TEXT"), ("chapter_number", "INTEGER")]:
+                try:
+                    connection.execute(f"ALTER TABLE sessions ADD COLUMN {col} {col_type}")
+                except Exception:
+                    pass
 
     # ---------------------------------------------------------------- sessions
     def save_session(
@@ -146,6 +153,8 @@ class Storage:
         notes: dict[str, Any] | None = None,
         markdown: str | None = None,
         session_id: str | None = None,
+        topic: str | None = None,
+        chapter_number: int | None = None,
     ) -> str:
         identifier = session_id or uuid4().hex
         created = _now()
@@ -154,8 +163,8 @@ class Storage:
                 """
                 INSERT INTO sessions
                     (id, created_at, title, class_level, subject, duration_s, transcript,
-                     notes_json, markdown)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     notes_json, markdown, topic, chapter_number)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     title=excluded.title,
                     class_level=excluded.class_level,
@@ -163,7 +172,9 @@ class Storage:
                     duration_s=excluded.duration_s,
                     transcript=excluded.transcript,
                     notes_json=excluded.notes_json,
-                    markdown=excluded.markdown
+                    markdown=excluded.markdown,
+                    topic=excluded.topic,
+                    chapter_number=excluded.chapter_number
                 """,
                 (
                     identifier,
@@ -175,6 +186,8 @@ class Storage:
                     transcript,
                     json.dumps(notes, ensure_ascii=False) if notes is not None else None,
                     markdown,
+                    topic,
+                    chapter_number,
                 ),
             )
             connection.execute("DELETE FROM utterances WHERE session_id = ?", (identifier,))
@@ -267,7 +280,48 @@ class Storage:
             "notes": _loads(session["notes_json"]),
             "markdown": note_row["markdown"] if note_row else session["markdown"],
             "lines": [dict(row) for row in rows],
+            "topic": session["topic"] if "topic" in session.keys() else None,
+            "chapter_number": session["chapter_number"] if "chapter_number" in session.keys() else None,
         }
+
+    def get_notes_by_chapter(
+        self,
+        chapter_number: int,
+        *,
+        class_level: int | None = None,
+        subject: str | None = None,
+    ) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            cursor = connection.execute(
+                """
+                SELECT id, created_at, title, class_level, subject, duration_s,
+                       transcript, notes_json, markdown, topic, chapter_number
+                FROM sessions
+                WHERE chapter_number = ?
+                  AND (class_level = ? OR ? IS NULL)
+                  AND (subject = ? OR ? IS NULL)
+                  AND markdown IS NOT NULL AND markdown != ''
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (chapter_number, class_level, class_level, subject, subject),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return {
+                "id": row["id"],
+                "created_at": row["created_at"],
+                "title": row["title"],
+                "class_level": row["class_level"],
+                "subject": row["subject"],
+                "duration_s": row["duration_s"],
+                "transcript": row["transcript"],
+                "notes": _loads(row["notes_json"]),
+                "markdown": row["markdown"],
+                "topic": row["topic"],
+                "chapter_number": row["chapter_number"],
+            }
 
     # ------------------------------------------------------------------ quizzes
     def create_quiz(

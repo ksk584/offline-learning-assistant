@@ -3690,3 +3690,285 @@ button {
     align-items: stretch;
   }
 }
+
+/* ========================================================================== */
+/* EXPANDED NOTES & TRANSCRIPT-TO-NOTES ENHANCEMENTS                          */
+/* ========================================================================== */
+
+/* Layout Full-Width Expanded Mode */
+.layout.notes-expanded {
+  grid-template-columns: 1fr;
+  max-width: 1360px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 18px 24px 28px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.layout.notes-expanded .sidebar {
+  display: none !important;
+}
+
+.layout.notes-expanded .workspace {
+  grid-template-columns: 1fr !important;
+}
+
+.layout.notes-expanded .caption-panel {
+  display: none !important;
+}
+
+.layout.notes-expanded .notes-panel {
+  width: 100%;
+  min-height: calc(100vh - 150px);
+}
+
+/* Expand / Collapse Button in Notes Header */
+.expand-notes-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px !important;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #93c5fd !important;
+  background: rgba(30, 58, 138, 0.25) !important;
+  border: 1px solid rgba(59, 130, 246, 0.35) !important;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.expand-notes-btn:hover {
+  background: rgba(37, 99, 235, 0.4) !important;
+  border-color: #60a5fa !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.35);
+}
+
+.expand-notes-btn.active {
+  background: rgba(59, 130, 246, 0.35) !important;
+  border-color: #93c5fd !important;
+  color: #ffffff !important;
+}
+
+.expand-notes-btn .expand-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.expand-notes-btn .expand-text {
+  letter-spacing: 0.02em;
+}
+
+/* Caption Header & Footer Convert Pill */
+.caption-convert-btn {
+  animation: pulse-border 2.5s infinite ease-in-out;
+}
+
+@keyframes pulse-border {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+  }
+}
+
+.caption-convert-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #93c5fd;
+  background: rgba(37, 99, 235, 0.22);
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: all 0.18s ease;
+}
+
+.caption-convert-pill:hover:not(:disabled) {
+  background: #2563eb;
+  border-color: #93c5fd;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+  transform: translateY(-1px);
+}
+
+.caption-convert-pill svg {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+/* Mapped Topic Banner in Notes */
+.mapped-topic-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 58, 138, 0.28));
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.28);
+}
+
+.mapped-topic-banner.stored-history {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(16, 185, 129, 0.14));
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.mapped-topic-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mapped-topic-pill {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #93c5fd;
+  background: rgba(37, 99, 235, 0.25);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+}
+
+.mapped-topic-banner.stored-history .mapped-topic-pill {
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+.mapped-topic-info strong {
+  display: block;
+  font-size: 0.95rem;
+  color: #f8fafc;
+  font-weight: 700;
+}
+
+.mapped-topic-info p {
+  margin: 2px 0 0;
+  font-size: 0.76rem;
+  color: #94a3b8;
+}
+
+.mapped-topic-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #60a5fa;
+  background: rgba(37, 99, 235, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  white-space: nowrap;
+}
+
+.mapped-topic-badge.stored {
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+/* Transcript Ready to Convert Prompt Card */
+.transcript-convert-prompt-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px 26px;
+  margin: 16px 0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(30, 58, 138, 0.25));
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.prompt-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: rgba(37, 99, 235, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: #60a5fa;
+  flex-shrink: 0;
+}
+
+.prompt-card-icon svg {
+  width: 26px !important;
+  height: 26px !important;
+}
+
+.prompt-card-body {
+  flex: 1;
+}
+
+.prompt-card-body h3 {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.prompt-card-body p {
+  margin: 0 0 14px;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  line-height: 1.45;
+}
+
+/* Transcript Syllabus Correlation Error Card */
+.transcript-correlation-error-card {
+  padding: 20px 24px;
+  margin: 16px 0;
+  border-radius: 14px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.12);
+}
+
+.error-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  color: #fca5a5;
+  font-size: 0.98rem;
+}
+
+.error-card-header svg {
+  width: 18px !important;
+  height: 18px !important;
+  color: #f87171;
+  flex-shrink: 0;
+}
+
+.error-card-message {
+  margin: 0 0 12px;
+  font-size: 0.88rem;
+  color: #fecaca;
+  line-height: 1.5;
+}
+
+.error-card-help {
+  padding: 9px 13px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  font-size: 0.78rem;
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+

@@ -45,6 +45,9 @@ export function App() {
   const [markdown, setMarkdown] = useState("");
   const [notesLoading, setNotesLoading] = useState(false);
   const [notesError, setNotesError] = useState<string | null>(null);
+  const [notesExpanded, setNotesExpanded] = useState<boolean>(false);
+  const [mappedTopic, setMappedTopic] = useState<string | null>(null);
+  const [chapterNumber, setChapterNumber] = useState<number | null>(null);
   const [mainView, setMainView] = useState<"capture" | "ask" | "quiz" | "teacher" | "pdf">("capture");
   const [activeNcertUnit, setActiveNcertUnit] = useState<number>(1);
   const [uploading, setUploading] = useState(false);
@@ -100,6 +103,8 @@ export function App() {
   const clearDerived = useCallback(() => {
     setNotes(null);
     setMarkdown("");
+    setMappedTopic(null);
+    setChapterNumber(null);
     setNotesError(null);
     setUploadInfo(null);
     setUploadError(null);
@@ -290,9 +295,12 @@ export function App() {
         subject,
         profile,
         use_llm: profile !== "extractive",
+        use_syllabus: true,
       });
       setNotes(response.notes);
       setMarkdown(response.markdown);
+      setMappedTopic(response.mapped_topic || null);
+      setChapterNumber(response.chapter_number || null);
     } catch (error) {
       setNotesError(messageOf(error));
     } finally {
@@ -496,7 +504,7 @@ export function App() {
           />
         </div>
       ) : (
-        <div className="layout">
+        <div className={`layout ${notesExpanded ? "notes-expanded" : ""}`}>
           <aside className="sidebar">
           <section className="panel control-panel">
             <header className="panel-header">
@@ -643,6 +651,9 @@ export function App() {
             partial={partial}
             phase={phase}
             onClear={handleClear}
+            onGenerate={generate}
+            generatingNotes={notesLoading}
+            hasNotes={notes !== null}
           />
           <NotesPane
             notes={notes}
@@ -650,11 +661,18 @@ export function App() {
             loading={notesLoading}
             error={notesError}
             hasLines={finals.length > 0}
+            finalsCount={finals.length}
             onGenerate={generate}
             onSelectNcertUnit={loadNcertUnit}
             activeNcertUnit={activeNcertUnit}
             onStartMic={startMic}
             onPlayDemo={playDemo}
+            isExpanded={notesExpanded}
+            onToggleExpand={() => setNotesExpanded((prev) => !prev)}
+            mappedTopic={mappedTopic}
+            chapterNumber={chapterNumber}
+            classLevel={classLevel}
+            subject={subject}
           />
         </main>
       </div>

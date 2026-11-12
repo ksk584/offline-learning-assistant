@@ -157,6 +157,22 @@ export interface NotesResult {
 export interface NotesResponse {
   notes: NotesResult;
   markdown: string;
+  mapped_topic?: string;
+  chapter_number?: number;
+  correlation_score?: number;
+  matched_terms?: string[];
+  session_id?: string;
+}
+
+export interface StoredLectureNotesResponse {
+  found: boolean;
+  session_id?: string;
+  title?: string;
+  topic?: string;
+  chapter_number?: number;
+  markdown?: string | null;
+  notes?: NotesResult | null;
+  created_at?: string;
 }
 
 export interface TranscribeResponse {

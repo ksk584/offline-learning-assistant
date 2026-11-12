@@ -10,6 +10,7 @@ import type {
   QuizStartResponse,
   RemediationAnswerResult,
   RemediationPack,
+  StoredLectureNotesResponse,
   TeacherOverview,
   TeacherStudentDetail,
   TranscribeResponse,
@@ -49,6 +50,7 @@ export interface NotesRequest {
   subject: string;
   profile: string;
   use_llm: boolean;
+  use_syllabus?: boolean;
 }
 
 export function createNotes(payload: NotesRequest): Promise<NotesResponse> {
@@ -240,4 +242,16 @@ export function getTeacherStudents(): Promise<{ students: string[] }> {
 
 export function getTeacherStudentDetail(studentId: string): Promise<TeacherStudentDetail> {
   return request<TeacherStudentDetail>(`/api/teacher/students/${encodeURIComponent(studentId)}`);
+}
+
+export function getStoredLectureNotes(
+  chapterNumber: number,
+  classLevel: number = 10,
+  subject: string = "maths",
+): Promise<StoredLectureNotesResponse> {
+  const params = new URLSearchParams({
+    class_level: String(classLevel),
+    subject,
+  });
+  return request<StoredLectureNotesResponse>(`/api/lecture-notes/${chapterNumber}?${params.toString()}`);
 }
