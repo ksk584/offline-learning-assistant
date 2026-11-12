@@ -115,9 +115,13 @@ echo [*] Setting up Python virtual environment and dependencies...
 if defined UV_CMD (
     !UV_CMD! sync --extra llm
     if !errorlevel! neq 0 (
-        echo [*] Running fallback dependency install via uv pip...
+        echo [*] Running fallback dependency install with pre-compiled wheels...
         !UV_CMD! venv .venv
-        !UV_CMD! pip install -e .[llm] pypdf huggingface-hub scikit-learn
+        !UV_CMD! pip install -e .[llm] --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+        if !errorlevel! neq 0 (
+            echo [*] Installing core package dependencies...
+            !UV_CMD! pip install -e .
+        )
     )
 ) else (
     if not exist ".venv\Scripts\activate.bat" (
@@ -125,7 +129,10 @@ if defined UV_CMD (
     )
     call .venv\Scripts\activate.bat
     python -m pip install --upgrade pip
-    pip install -e .[llm] pypdf huggingface-hub scikit-learn
+    pip install -e .[llm] --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+    if !errorlevel! neq 0 (
+        pip install -e .
+    )
 )
 
 echo [✓] Core dependencies and virtual environment ready.
@@ -136,10 +143,8 @@ echo [✓] Core dependencies and virtual environment ready.
 echo [*] Checking on-device LLM model...
 set "MODEL_FOUND=0"
 
-if exist "models\llm\Qwen3.5-0.8B-Q4_K_M.gguf" set "MODEL_FOUND=1"
-if exist "models\llm\Qwen3.5-2B-Q4_K_M.gguf" set "MODEL_FOUND=1"
-if exist "%USERPROFILE%\.ila\models\llm\Qwen3.5-0.8B-Q4_K_M.gguf" set "MODEL_FOUND=1"
-if exist "%USERPROFILE%\.ila\models\llm\Qwen3.5-2B-Q4_K_M.gguf" set "MODEL_FOUND=1"
+if exist "models\llm\*.gguf" set "MODEL_FOUND=1"
+if exist "%USERPROFILE%\.ila\models\llm\*.gguf" set "MODEL_FOUND=1"
 
 if "!MODEL_FOUND!"=="1" (
     echo [✓] Offline LLM model found and verified.

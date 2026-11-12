@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Singular setup and runner for Offline Intelligent Learning Assistant (ILA).
     Works on any Windows device with Python 3.11+.
@@ -71,29 +71,30 @@ if ($UvCmd) {
 Write-Host "[*] Syncing virtual environment and dependencies..." -ForegroundColor Yellow
 if ($UvCmd) {
     & $UvCmd sync --extra llm
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[*] Fallback: installing with pre-compiled wheels..." -ForegroundColor Yellow
+        & $UvCmd venv .venv
+        & $UvCmd pip install -e ".[llm]" --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+        if ($LASTEXITCODE -ne 0) {
+            & $UvCmd pip install -e .
+        }
+    }
 } else {
     if (-not (Test-Path ".venv\Scripts\activate.ps1")) {
         & $PythonCmd -m venv .venv
     }
-    & ".venv\Scripts\python.exe" -m pip install -e ".[llm]" pypdf huggingface-hub scikit-learn
+    & ".venv\Scripts\python.exe" -m pip install -e ".[llm]" --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+    if ($LASTEXITCODE -ne 0) {
+        & ".venv\Scripts\python.exe" -m pip install -e .
+    }
 }
 Write-Host "[✓] Dependencies installed." -ForegroundColor Green
 
 # 4. Check Local LLM Models
 Write-Host "[*] Checking on-device LLM model..." -ForegroundColor Yellow
-$ModelExists = $false
-$ModelCandidates = @(
-    "models\llm\Qwen3.5-0.8B-Q4_K_M.gguf",
-    "models\llm\Qwen3.5-2B-Q4_K_M.gguf",
-    "$env:USERPROFILE\.ila\models\llm\Qwen3.5-0.8B-Q4_K_M.gguf",
-    "$env:USERPROFILE\.ila\models\llm\Qwen3.5-2B-Q4_K_M.gguf"
-)
-foreach ($m in $ModelCandidates) {
-    if (Test-Path $m) {
-        $ModelExists = $true
-        break
-    }
-}
+$LocalModels = @(Get-ChildItem -Path "models\llm\*.gguf" -ErrorAction SilentlyContinue)
+$UserModels = @(Get-ChildItem -Path "$env:USERPROFILE\.ila\models\llm\*.gguf" -ErrorAction SilentlyContinue)
+$ModelExists = ($LocalModels.Count -gt 0) -or ($UserModels.Count -gt 0)
 
 if ($ModelExists) {
     Write-Host "[✓] Offline LLM model found." -ForegroundColor Green
