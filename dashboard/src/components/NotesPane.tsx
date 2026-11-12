@@ -100,6 +100,8 @@ export function NotesPane({
   const [storedLectureNote, setStoredLectureNote] = useState<StoredLectureNotesResponse | null>(null);
   const [selectedPage, setSelectedPage] = useState<"all" | number>("all");
   const [copied, setCopied] = useState<boolean>(false);
+  const [unitsCollapsed, setUnitsCollapsed] = useState<boolean>(false);
+  const [bottomExpanded, setBottomExpanded] = useState<boolean>(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -183,7 +185,6 @@ export function NotesPane({
 
   const handleUnitClick = (unitId: number) => {
     setSelectedUnit(unitId);
-    onSelectNcertUnit?.(unitId);
   };
 
   const currentMarkdown =
@@ -226,7 +227,7 @@ export function NotesPane({
   const currentUnitInfo = UNITS.find((u) => u.id === selectedUnit) || UNITS[0];
 
   return (
-    <section className="panel notes-panel" ref={containerRef}>
+    <section className={`panel notes-panel ${bottomExpanded ? "bottom-expanded" : ""}`} ref={containerRef}>
       {/* Top Header */}
       <header className="panel-header">
         <div>
@@ -288,37 +289,74 @@ export function NotesPane({
         </div>
       </header>
 
-      {/* Clean Organized Unit List */}
-      <div className="unit-list-container">
+      {/* Clean Organized Unit List with Collapse/Expand Toggle */}
+      <div className={`unit-list-container ${unitsCollapsed || bottomExpanded ? "collapsed" : ""}`}>
         <div className="unit-list-header">
-          <span className="unit-list-title">NCERT Class 10 Units</span>
-          <span className="unit-list-meta">10 Pages / Unit · Local LLM Grounded</span>
+          <div className="unit-list-title-wrap">
+            <span className="unit-list-title">NCERT Class 10 Units</span>
+            {(unitsCollapsed || bottomExpanded) ? (
+              <span className="unit-compact-name">
+                Selected: Unit {selectedUnit} — {currentUnitInfo.title}
+              </span>
+            ) : (
+              <span className="unit-list-meta">10 Pages / Unit · Local LLM Grounded</span>
+            )}
+          </div>
+          <button
+            type="button"
+            className="btn-toggle-units-pill"
+            onClick={() => {
+              if (bottomExpanded) setBottomExpanded(false);
+              setUnitsCollapsed((prev) => !prev);
+            }}
+            title={unitsCollapsed || bottomExpanded ? "Show 3 unit cards" : "Collapse units to expand bottom reading area"}
+          >
+            {unitsCollapsed || bottomExpanded ? "▼ Expand Units List" : "▲ Collapse Units (Expand Notes)"}
+          </button>
         </div>
-        <div className="unit-clean-cards">
-          {UNITS.map((u) => {
-            const isSelected = selectedUnit === u.id;
-            return (
+
+        {!(unitsCollapsed || bottomExpanded) ? (
+          <div className="unit-clean-cards">
+            {UNITS.map((u) => {
+              const isSelected = selectedUnit === u.id;
+              return (
+                <button
+                  key={u.id}
+                  type="button"
+                  className={`unit-clean-card ${isSelected ? "selected" : ""}`}
+                  onClick={() => handleUnitClick(u.id)}
+                >
+                  <div className="unit-clean-card-left">
+                    <span className="unit-pill">Unit {u.id}</span>
+                    <div className="unit-meta-texts">
+                      <strong className="unit-card-heading">{u.title}</strong>
+                      <span className="unit-card-sub">{u.topics}</span>
+                    </div>
+                  </div>
+                  <div className="unit-clean-card-right">
+                    <span className="unit-page-tag">10 Pages</span>
+                    {isSelected && <span className="unit-active-glow" />}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="unit-compact-chips-row">
+            {UNITS.map((u) => (
               <button
                 key={u.id}
                 type="button"
-                className={`unit-clean-card ${isSelected ? "selected" : ""}`}
+                className={`unit-compact-chip ${selectedUnit === u.id ? "active" : ""}`}
                 onClick={() => handleUnitClick(u.id)}
+                title={u.topics}
               >
-                <div className="unit-clean-card-left">
-                  <span className="unit-pill">Unit {u.id}</span>
-                  <div className="unit-meta-texts">
-                    <strong className="unit-card-heading">{u.title}</strong>
-                    <span className="unit-card-sub">{u.topics}</span>
-                  </div>
-                </div>
-                <div className="unit-clean-card-right">
-                  <span className="unit-page-tag">10 Pages</span>
-                  {isSelected && <span className="unit-active-glow" />}
-                </div>
+                <span className="compact-chip-pill">Unit {u.id}</span>
+                <span>{u.title.replace(/^Unit \d+:\s*/, "")}</span>
               </button>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Dual Tabs for Selected Unit: Textbook vs Transcript vs Both */}
@@ -370,27 +408,55 @@ export function NotesPane({
               </div>
             )}
 
-            {/* Textbook Page Navigation Filter */}
+            {/* Textbook Page Navigation Filter with Bottom-Expand & Full-Reader Buttons */}
             <div className="textbook-page-bar">
-              <span className="page-bar-label">Page Filter:</span>
-              <button
-                type="button"
-                className={`page-chip ${selectedPage === "all" ? "active" : ""}`}
-                onClick={() => setSelectedPage("all")}
-              >
-                All 10 Pages
-              </button>
-              {pages.map((p) => (
+              <div className="page-bar-left">
+                <span className="page-bar-label">Page Filter:</span>
                 <button
-                  key={p.page_number}
                   type="button"
-                  className={`page-chip ${selectedPage === p.page_number ? "active" : ""}`}
-                  onClick={() => setSelectedPage(p.page_number)}
-                  title={`Section ${p.section_id}: ${p.title}`}
+                  className={`page-chip ${selectedPage === "all" ? "active" : ""}`}
+                  onClick={() => setSelectedPage("all")}
                 >
-                  Pg {p.page_number}
+                  All 10 Pages
                 </button>
-              ))}
+                {pages.map((p) => (
+                  <button
+                    key={p.page_number}
+                    type="button"
+                    className={`page-chip ${selectedPage === p.page_number ? "active" : ""}`}
+                    onClick={() => setSelectedPage(p.page_number)}
+                    title={`Section ${p.section_id}: ${p.title}`}
+                  >
+                    Pg {p.page_number}
+                  </button>
+                ))}
+              </div>
+
+              <div className="page-bar-actions">
+                <button
+                  type="button"
+                  className={`bottom-expand-btn ${bottomExpanded ? "active" : ""}`}
+                  onClick={() => {
+                    const next = !bottomExpanded;
+                    setBottomExpanded(next);
+                    if (next) setUnitsCollapsed(true);
+                  }}
+                  title={bottomExpanded ? "Collapse notes area to normal height" : "Expand bottom reading area to full height"}
+                >
+                  <span className="expand-btn-icon">{bottomExpanded ? "⤓" : "⛶"}</span>
+                  <span>{bottomExpanded ? "Collapse View" : "Expand Bottom Part"}</span>
+                </button>
+                {onSelectNcertUnit && (
+                  <button
+                    type="button"
+                    className="open-full-reader-pill"
+                    onClick={() => onSelectNcertUnit(selectedUnit)}
+                    title="Open Dedicated 10-Page Master Reader screen"
+                  >
+                    <span>📑 Full Reader</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {textbookLoading ? (
@@ -414,13 +480,40 @@ export function NotesPane({
                 ).map((page: NcertPage) => (
                   <article key={page.page_number} className="textbook-doc-sheet">
                     <div className="sheet-running-header">
-                      <span className="sheet-h-subject">NCERT Class 10 Mathematics</span>
-                      <span className="sheet-h-title">
-                        Unit {selectedUnit}: {currentUnitInfo.title}
-                      </span>
-                      <span className="sheet-h-page">
-                        Page {page.page_number} of {pages.length || 10}
-                      </span>
+                      <div className="sheet-running-title-group">
+                        <span className="sheet-h-subject">NCERT Class 10 Mathematics</span>
+                        <span className="sheet-h-title">
+                          Unit {selectedUnit}: {currentUnitInfo.title}
+                        </span>
+                        <span className="sheet-h-page">
+                          Page {page.page_number} of {pages.length || 10}
+                        </span>
+                      </div>
+
+                      <div className="sheet-header-actions">
+                        <button
+                          type="button"
+                          className={`sheet-expand-pill ${bottomExpanded ? "active" : ""}`}
+                          onClick={() => {
+                            const next = !bottomExpanded;
+                            setBottomExpanded(next);
+                            if (next) setUnitsCollapsed(true);
+                          }}
+                          title={bottomExpanded ? "Exit expanded view" : "Expand bottom sheet to full height"}
+                        >
+                          {bottomExpanded ? "⤓ Normal" : "⛶ Expand Sheet"}
+                        </button>
+                        {onSelectNcertUnit && (
+                          <button
+                            type="button"
+                            className="sheet-full-reader-pill"
+                            onClick={() => onSelectNcertUnit(selectedUnit)}
+                            title="Open Dedicated 10-Page Reader Screen"
+                          >
+                            📑 Full Reader
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="sheet-sec-badge">
@@ -463,6 +556,23 @@ export function NotesPane({
                 <span>🎙️ Lecture Transcript Grounded Notes (Current Session)</span>
               </div>
             )}
+
+            {/* Transcript View Actions Toolbar */}
+            <div className="transcript-toolbar-row">
+              <button
+                type="button"
+                className={`bottom-expand-btn compact ${bottomExpanded ? "active" : ""}`}
+                onClick={() => {
+                  const next = !bottomExpanded;
+                  setBottomExpanded(next);
+                  if (next) setUnitsCollapsed(true);
+                }}
+                title={bottomExpanded ? "Collapse notes area" : "Expand lecture notes area to full height"}
+              >
+                <span className="expand-btn-icon">{bottomExpanded ? "⤓" : "⛶"}</span>
+                <span>{bottomExpanded ? "Collapse Height" : "Expand Bottom Part"}</span>
+              </button>
+            </div>
 
             {transcriptLoading ? (
               <div className="notes-loading-card">
