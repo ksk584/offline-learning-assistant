@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { AppConfig, DemoLecture, SyllabusContext } from "../types";
-import { BookIcon, PlayIcon, SearchIcon, StopIcon } from "./icons";
+import { PlayIcon, SearchIcon, StopIcon } from "./icons";
 
 interface CurriculumPanelProps {
   config: AppConfig | null;
@@ -46,11 +46,6 @@ export function CurriculumPanel({
     [syllabus],
   );
 
-  const demoChapter = useMemo(() => {
-    const hit = demo?.chapter.match(/chapter\s+(\d{1,2})/i);
-    return hit ? Number(hit[1]) : null;
-  }, [demo]);
-
   const chapters = useMemo(() => {
     if (!course) return [];
     const needle = query.trim().toLowerCase();
@@ -68,46 +63,48 @@ export function CurriculumPanel({
   };
 
   return (
-    <section className="panel curriculum-panel">
+    <section className="panel curriculum-panel" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+      {/* Header */}
       <header className="panel-header">
-        <div>
-          <p className="panel-kicker">NCERT · India</p>
-          <h2>Syllabus map</h2>
+        <div className="panel-title-group">
+          <span className="panel-kicker">Curriculum Alignment</span>
+          <h2>NCERT Syllabus</h2>
         </div>
         <div className="panel-actions">
-          <span className="chip">
-            <BookIcon />
-            Class&nbsp;{classLevel}
-          </span>
+          <span className="badge">Class {classLevel}</span>
         </div>
       </header>
 
       <div className="curriculum-body">
-        <div className="control-group">
-          <span className="field-label">Class</span>
-          <div className="segmented" role="group" aria-label="Class level">
+        {/* Class Level Selector */}
+        <div>
+          <span className="field-label">Grade / Class</span>
+          <div className="segmented" style={{ width: "100%", display: "flex" }}>
             {(config?.curriculum.class_levels ?? [8, 9, 10]).map((level) => (
               <button
                 key={level}
                 type="button"
                 className={level === classLevel ? "active" : ""}
                 onClick={() => onSelect(level, subject)}
+                style={{ flex: 1 }}
               >
-                {level}
+                Class {level}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="control-group">
+        {/* Subject Selector */}
+        <div>
           <span className="field-label">Subject</span>
-          <div className="segmented" role="group" aria-label="Subject">
+          <div className="segmented" style={{ width: "100%", display: "flex" }}>
             {(config?.curriculum.subjects ?? ["science", "maths"]).map((name) => (
               <button
                 key={name}
                 type="button"
                 className={name === subject ? "active" : ""}
                 onClick={() => onSelect(classLevel, name)}
+                style={{ flex: 1 }}
               >
                 {subjectLabels[name] ?? name}
               </button>
@@ -115,19 +112,34 @@ export function CurriculumPanel({
           </div>
         </div>
 
-        <div className="course-summary">
-          <div>
-            <strong>{course?.label ?? "Loading course…"}</strong>
-            <span>
-              {course ? `${course.chapters.length} chapters` : "from /api/config"}
+        {/* Built-in Demo Lecture Action */}
+        <div
+          style={{
+            padding: "10px 12px",
+            background: "var(--bg-surface-subtle)",
+            border: "1px solid var(--border-subtle)",
+            borderRadius: "var(--radius-md)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 10,
+          }}
+        >
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {demo ? demo.title : `NCERT Class ${classLevel} Demo`}
+            </div>
+            <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+              {course ? `${course.chapters.length} chapters loaded` : "Local curriculum"}
             </span>
           </div>
+
           <button
             type="button"
-            className="btn ghost compact"
+            className={`btn btn-sm ${demoPlaying ? "btn-danger" : "btn-secondary"}`}
             onClick={demoPlaying ? onStopDemo : onPlayDemo}
             disabled={demoLoading}
-            title="Replay a built-in NCERT lecture without a microphone"
+            title="Replay an official NCERT demo lecture"
           >
             {demoLoading ? (
               <span className="spinner small" />
@@ -136,101 +148,84 @@ export function CurriculumPanel({
             ) : (
               <PlayIcon />
             )}
-            {demoLoading ? "Loading" : demoPlaying ? "Stop demo" : "Play demo"}
+            <span>{demoLoading ? "Loading…" : demoPlaying ? "Stop" : "Play Demo"}</span>
           </button>
         </div>
 
-        {syllabus && syllabus.matches.length > 0 ? (
-          <div className="match-list">
-            {syllabus.matches.map((match) => (
-              <div className="match-card" key={match.number}>
-                <span className="match-score">{match.score.toFixed(1)}</span>
-                <div>
-                  <strong>
-                    Ch {match.number} · {match.title}
-                  </strong>
-                  {match.matched_terms.length ? (
-                    <p className="match-terms">
-                      {match.matched_terms.slice(0, 5).join(" · ")}
-                    </p>
-                  ) : null}
-                </div>
+        {/* Syllabus Correlation Matches (if available) */}
+        {syllabus && syllabus.matches.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span className="field-label">Syllabus Match</span>
+            {syllabus.matches.slice(0, 2).map((match) => (
+              <div
+                key={match.number}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "6px 10px",
+                  borderRadius: "var(--radius-sm)",
+                  background: "var(--accent-subtle)",
+                  border: "1px solid var(--accent-border)",
+                  fontSize: "0.76rem",
+                }}
+              >
+                <span style={{ fontWeight: 600, color: "var(--accent-text)" }}>
+                  Ch {match.number}: {match.title}
+                </span>
+                <span className="badge badge-accent" style={{ height: 18, fontSize: "0.68rem" }}>
+                  {match.score.toFixed(1)} match
+                </span>
               </div>
             ))}
           </div>
-        ) : (
-          <p className="hint">
-            {syllabus
-              ? "No confident chapter match yet. Generate notes from the transcript to align it."
-              : "Generate notes to align this lecture to a chapter. Matching needs at least two supporting terms."}
-          </p>
         )}
 
-        <div className="chapter-search">
-          <SearchIcon />
-          <input
-            type="search"
-            placeholder="Find a chapter or number…"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            aria-label="Search chapters"
-          />
+        {/* Chapter Search Bar */}
+        <div>
+          <span className="field-label">Browse Syllabus Chapters</span>
+          <div className="chapter-search-box">
+            <SearchIcon />
+            <input
+              type="search"
+              placeholder="Filter chapters by title or #…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label="Filter chapters"
+            />
+          </div>
         </div>
 
-        <ul className="chapter-list">
-          {chapters.map((chapter) => {
-            const match = matches.get(chapter.number);
-            const isDemo = demoChapter === chapter.number;
-            const hasNcertNotes =
-              classLevel === 10 &&
-              (subject === "maths" || subject === "mathematics") &&
-              [1, 2, 3].includes(chapter.number);
+        {/* Scrollable Chapter List */}
+        <div className="chapter-list-scroll">
+          {chapters.map((ch) => {
+            const hasMatch = matches.has(ch.number);
+            const isNcertActive = activeNcertUnit === ch.number;
             return (
-              <li
-                key={chapter.number}
-                className={`chapter-item ${match ? "matched" : ""} ${
-                  isDemo ? "current" : ""
-                }`}
-                title={chapter.title}
-                style={{ display: "flex", alignItems: "center", gap: "6px" }}
+              <button
+                key={ch.number}
+                type="button"
+                className={`chapter-item-btn ${isNcertActive ? "selected" : ""}`}
+                onClick={() => onSelectNcertUnit?.(ch.number)}
+                title={`NCERT Unit ${ch.number}: ${ch.title}`}
               >
-                <span className="chapter-number">{chapter.number}</span>
-                <span className="chapter-title" style={{ flex: 1 }}>{chapter.title}</span>
-                {isDemo && !match ? <span className="demo-badge">demo</span> : null}
-                {match ? <span className="score-badge">{match.score.toFixed(1)}</span> : null}
-                {hasNcertNotes ? (
-                  <button
-                    type="button"
-                    className={`btn compact ${activeNcertUnit === chapter.number ? "primary" : "ghost"}`}
-                    style={{
-                      fontSize: "0.72rem",
-                      padding: "2px 7px",
-                      marginLeft: "auto",
-                      whiteSpace: "nowrap",
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelectNcertUnit?.(chapter.number);
-                    }}
-                    title={`View generated 10-page notes for Unit ${chapter.number}`}
-                  >
-                    📖 10-Pg Notes
-                  </button>
-                ) : null}
-              </li>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.72rem", color: "var(--text-muted)" }}>
+                    {String(ch.number).padStart(2, "0")}
+                  </span>
+                  <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {ch.title}
+                  </span>
+                </div>
+                {hasMatch && (
+                  <span className="badge badge-accent" style={{ height: 16, fontSize: "0.65rem", padding: "0 4px" }}>
+                    Matched
+                  </span>
+                )}
+              </button>
             );
           })}
-          {!chapters.length ? (
-            <li className="chapter-item">
-              <span className="chapter-title">No chapter matches that search.</span>
-            </li>
-          ) : null}
-        </ul>
-
-        <p className="panel-footnote">
-          Chapter hints steer terminology only. The grounding verifier still checks every
-          generated line against the transcript.
-        </p>
+        </div>
       </div>
     </section>
   );

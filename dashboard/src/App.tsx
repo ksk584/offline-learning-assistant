@@ -8,25 +8,28 @@ import { PdfNotesViewer } from "./components/PdfNotesViewer";
 import { QuizPane } from "./components/QuizPane";
 import { TeacherDashboard } from "./components/TeacherDashboard";
 import {
+  BarChartIcon,
   BookIcon,
-  CpuIcon,
+  CheckCircleIcon,
+  FileTextIcon,
+  MessageSquareIcon,
   MicIcon,
-  ShieldIcon,
-  SparkIcon,
+  SettingsIcon,
   StopIcon,
   UploadIcon,
   WarningIcon,
+  XIcon,
 } from "./components/icons";
 import { formatDuration, messageOf } from "./format";
 import type { AppConfig, DemoLecture, DemoLine, NotesResult } from "./types";
 import { useCaptions } from "./useCaptions";
 
 const PROFILE_LABELS: Record<string, string> = {
-  extractive: "Extractive only · no model",
-  auto: "Auto · detect hardware",
-  potato: "Potato · 0.8B Q4",
-  balanced: "Balanced · 2B Q4",
-  full: "Full · 4B Q4",
+  extractive: "Extractive TextRank (No LLM)",
+  auto: "Auto · Hardware Detected",
+  potato: "Potato · Qwen 0.8B Q4",
+  balanced: "Balanced · Qwen 2B Q4",
+  full: "Full · Qwen 4B Q4",
 };
 
 const DEMO_SPEED = 9;
@@ -53,6 +56,7 @@ export function App() {
   const [uploading, setUploading] = useState(false);
   const [uploadInfo, setUploadInfo] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const timers = useRef<number[]>([]);
 
@@ -130,8 +134,8 @@ export function App() {
     try {
       lecture = await getDemo(classLevel, subject);
     } catch (error) {
-      setDemoError(messageOf(error));
       setDemoLoading(false);
+      setDemoError(messageOf(error));
       return;
     }
 
@@ -175,11 +179,17 @@ export function App() {
       );
     });
 
+    const finishAt =
+      lecture.lines.length > 0
+        ? ((lecture.lines[lecture.lines.length - 1].end - baseline) / DEMO_SPEED) *
+            1000 +
+          400
+        : 1000;
     timers.current.push(
       window.setTimeout(() => {
         setDemoPlaying(false);
         setPhase("done");
-      }, Math.max(900, ((lecture.lines.at(-1)?.end ?? 0) - baseline) / DEMO_SPEED * 1000 + 500)),
+      }, finishAt),
     );
   }, [
     appendFinal,
@@ -194,42 +204,38 @@ export function App() {
   ]);
 
   const handleSelect = useCallback(
-    (level: number, name: string) => {
-      if (demoPlaying) {
-        clearTimers();
-        setDemoPlaying(false);
-        setPhase("done");
-      }
-      setClassLevel(level);
-      setSubject(name);
+    (nextLevel: number, nextSubject: string) => {
+      clearTimers();
+      disconnect();
+      reset();
+      clearDerived();
+      setClassLevel(nextLevel);
+      setSubject(nextSubject);
       setDemo(null);
-      setDemoError(null);
+      setDemoPlaying(false);
+      setDemoLoading(false);
     },
-    [clearTimers, demoPlaying, setPhase],
+    [clearDerived, clearTimers, disconnect, reset],
   );
-
-  const startMic = useCallback(() => {
-    clearTimers();
-    disconnect();
-    reset();
-    clearDerived();
-    setDemo(null);
-    setDemoPlaying(false);
-    start({
-      source: "mic",
-      model: config?.asr.model,
-      language: config?.asr.language ?? null,
-      partials: true,
-    });
-  }, [clearDerived, clearTimers, config, disconnect, reset, start]);
 
   const handleClear = useCallback(() => {
     clearTimers();
     disconnect();
     reset();
     clearDerived();
+    setDemo(null);
     setDemoPlaying(false);
+    setDemoLoading(false);
   }, [clearDerived, clearTimers, disconnect, reset]);
+
+  const startMic = useCallback(() => {
+    clearTimers();
+    setDemo(null);
+    setDemoPlaying(false);
+    setDemoLoading(false);
+    clearDerived();
+    start();
+  }, [clearDerived, clearTimers, start]);
 
   const handleUpload = useCallback(
     async (file: File) => {
@@ -239,14 +245,16 @@ export function App() {
       clearDerived();
       setDemo(null);
       setDemoPlaying(false);
+      setDemoLoading(false);
       setUploading(true);
-
+      setUploadError(null);
+      setUploadInfo(null);
       try {
         const response = await transcribeFile(file, {
           classLevel,
           subject,
           profile,
-          useLlm: profile !== "extractive",
+          useLlm: true,
         });
         loadTranscript(
           response.lines.map((line, index) => ({
@@ -339,143 +347,121 @@ export function App() {
   }, [classLevel, config, demo, subject, subjectLabel]);
 
   const sessionLabel = useMemo(() => {
-    if (demoPlaying) return "Playing NCERT demo";
-    if (uploading) return "Transcribing uploaded media";
+    if (demoPlaying) return "Playing NCERT demo lecture";
+    if (uploading) return "Transcribing uploaded media file";
     switch (phase) {
       case "connecting":
-        return "Connecting to local server";
+        return "Connecting to speech stream…";
       case "loading":
-        return "Loading Whisper model";
+        return "Loading Whisper model…";
       case "live":
-        return "Capturing (finals arrive on pauses)";
+        return "Listening · Speech captured";
       case "error":
-        return "Caption stream error";
+        return "Audio stream error";
       case "done":
-        return finals.length ? "Transcript ready" : "Session finished";
+        return finals.length ? "Transcript ready for review" : "Capture completed";
       default:
-        return "Idle — start a session or replay a demo";
+        return "Session idle";
     }
   }, [demoPlaying, finals.length, phase, uploading]);
 
-  const lightClass = demoPlaying || phase === "live"
-    ? "live"
-    : phase === "connecting" || phase === "loading" || uploading
-      ? "busy"
-      : phase === "error" || uploadError || demoError
-        ? "error"
-        : "";
-
-  const notesStatus = config
-    ? config.notes.available
-      ? `${config.notes.profile} · ${config.notes.model}`
-      : "extractive fallback"
-    : "checking models…";
-
   return (
-    <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <span className="brand-mark">
+    <div className="app-shell">
+      {/* ------------------------------------------------------------------ Top Header */}
+      <header className="app-header">
+        <div className="app-brand">
+          <div className="brand-mark">
             <BookIcon />
-          </span>
-          <div>
-            <p className="brand-eyebrow">SDG 4 · Team 9 · fully offline</p>
-            <h1>Offline Lecture Assistant</h1>
-            <p className="brand-sub">
-              Live captions, grounded Q&amp;A, adaptive quizzes and NCERT notes — no cloud,
-              no keys.
-            </p>
+          </div>
+          <div className="brand-info">
+            <span className="brand-name">Offline Lecture Assistant</span>
+            <span className="brand-curriculum">
+              Class {classLevel} · {subjectLabel}
+            </span>
           </div>
         </div>
-        <div className="status-strip">
-          <span className={`status-pill ${config?.offline ? "ok" : ""}`}>
-            <ShieldIcon />
-            {config?.offline ? "On-device" : "Offline"}
+
+        {/* Global Navigation Tabs (Linear style) */}
+        <nav className="app-nav" aria-label="Main Navigation">
+          <button
+            type="button"
+            className={`nav-tab-btn ${mainView === "capture" ? "active" : ""}`}
+            onClick={() => setMainView("capture")}
+          >
+            <MicIcon />
+            <span>Capture &amp; Notes</span>
+          </button>
+          <button
+            type="button"
+            className={`nav-tab-btn ${mainView === "ask" ? "active" : ""}`}
+            onClick={() => setMainView("ask")}
+          >
+            <MessageSquareIcon />
+            <span>Syllabus Q&amp;A</span>
+          </button>
+          <button
+            type="button"
+            className={`nav-tab-btn ${mainView === "quiz" ? "active" : ""}`}
+            onClick={() => setMainView("quiz")}
+          >
+            <CheckCircleIcon />
+            <span>Adaptive Quizzes</span>
+          </button>
+          <button
+            type="button"
+            className={`nav-tab-btn ${mainView === "teacher" ? "active" : ""}`}
+            onClick={() => setMainView("teacher")}
+          >
+            <BarChartIcon />
+            <span>Teacher Analytics</span>
+          </button>
+          <button
+            type="button"
+            className={`nav-tab-btn ${mainView === "pdf" ? "active" : ""}`}
+            onClick={() => setMainView("pdf")}
+          >
+            <FileTextIcon />
+            <span>NCERT Master Notes</span>
+          </button>
+        </nav>
+
+        {/* Right Utilities & Settings */}
+        <div className="app-utilities">
+          <span className="offline-pill" title="Fully on-device inference. Zero external API calls.">
+            <span className="offline-dot" />
+            <span>Local &amp; Offline</span>
           </span>
-          <span className="status-pill">
-            <CpuIcon />
-            {config ? `${config.asr.model} · ${config.asr.device}` : "loading config…"}
-          </span>
-          <span className={`status-pill ${config?.notes.available ? "ok" : "warn"}`}>
-            <SparkIcon />
-            {notesStatus}
-          </span>
+          <button
+            type="button"
+            className="btn-icon"
+            onClick={() => setShowSettings(true)}
+            title="System &amp; Model Settings"
+            aria-label="Settings"
+          >
+            <SettingsIcon />
+          </button>
         </div>
       </header>
 
-      {configError ? (
-        <div className="inline-warning error config-banner">
+      {/* Backend Unreachable Alert Banner */}
+      {configError && (
+        <div className="inline-warning error" style={{ margin: "10px 20px 0" }}>
           <WarningIcon />
           <span>
-            <strong>Backend unreachable.</strong> {configError} Start it with{" "}
+            <strong>Local backend unreachable.</strong> {configError} Start server via{" "}
             <code>ila serve</code>, then{" "}
-            <button type="button" className="link-btn" onClick={() => void loadConfig()}>
-              retry
+            <button type="button" className="btn btn-sm btn-ghost" onClick={() => void loadConfig()}>
+              Retry Connection
             </button>
-            .
           </span>
         </div>
-      ) : null}
+      )}
 
-      <div
-        className="view-mode-tabs"
-        style={{
-          display: "flex",
-          gap: "10px",
-          padding: "10px 24px",
-          background: "rgba(2, 4, 8, 0.95)",
-          borderBottom: "1px solid rgba(37, 99, 235, 0.25)",
-          flexWrap: "wrap",
-        }}
-      >
-        <button
-          type="button"
-          className={`btn ${mainView === "capture" ? "primary" : "ghost"}`}
-          style={{ padding: "8px 18px", fontSize: "0.88rem", fontWeight: 700 }}
-          onClick={() => setMainView("capture")}
-        >
-          🎙️ Live Capture &amp; Notes
-        </button>
-        <button
-          type="button"
-          className={`btn ${mainView === "ask" ? "primary" : "ghost"}`}
-          style={{ padding: "8px 18px", fontSize: "0.88rem", fontWeight: 700 }}
-          onClick={() => setMainView("ask")}
-        >
-          💬 Syllabus Q&amp;A with Citations
-        </button>
-        <button
-          type="button"
-          className={`btn ${mainView === "quiz" ? "primary" : "ghost"}`}
-          style={{ padding: "8px 18px", fontSize: "0.88rem", fontWeight: 700 }}
-          onClick={() => setMainView("quiz")}
-        >
-          🎯 Adaptive Quizzes &amp; Auto-Remediation
-        </button>
-        <button
-          type="button"
-          className={`btn ${mainView === "teacher" ? "primary" : "ghost"}`}
-          style={{ padding: "8px 18px", fontSize: "0.88rem", fontWeight: 700 }}
-          onClick={() => setMainView("teacher")}
-        >
-          👩‍🏫 Teacher Analytics &amp; Gaps
-        </button>
-        <button
-          type="button"
-          className={`btn ${mainView === "pdf" ? "primary" : "ghost"}`}
-          style={{ padding: "8px 18px", fontSize: "0.88rem", fontWeight: 700 }}
-          onClick={() => setMainView("pdf")}
-        >
-          📑 NCERT 10-Page Master Notes (Full Reader)
-        </button>
-      </div>
-
+      {/* ------------------------------------------------------------------ Main Workspaces */}
       {mainView === "pdf" ? (
-        <div style={{ flex: 1, padding: "16px 24px", display: "flex", overflow: "hidden", minHeight: "calc(100vh - 160px)" }}>
-          <PdfNotesViewer initialUnit={activeNcertUnit || 1} />
-        </div>
+        <PdfNotesViewer initialUnit={activeNcertUnit || 1} />
       ) : mainView === "teacher" ? (
-        <div className="study-view" style={{ flex: 1, display: "flex" }}>
+        <div className="study-view">
           <TeacherDashboard />
         </div>
       ) : mainView === "ask" ? (
@@ -504,56 +490,170 @@ export function App() {
           />
         </div>
       ) : (
+        /* Workspace 1: Live Capture & Notes */
         <div className={`layout ${notesExpanded ? "notes-expanded" : ""}`}>
+          {/* Left Area: Session Controls & Syllabus Map */}
           <aside className="sidebar">
-          <section className="panel control-panel">
-            <header className="panel-header">
-              <div>
-                <p className="panel-kicker">Lecture capture</p>
-                <h2>Session</h2>
+            {/* Session Card */}
+            <section className="panel control-panel">
+              <header className="panel-header">
+                <div className="panel-title-group">
+                  <span className="panel-kicker">Lecture Recording</span>
+                  <h2>Session Controls</h2>
+                </div>
+              </header>
+
+              <div className="control-body">
+                <div className="capture-action-row">
+                  <button
+                    type="button"
+                    className={`btn capture-btn ${busy ? "btn-danger" : "btn-primary"}`}
+                    onClick={busy ? stop : startMic}
+                    disabled={demoPlaying || uploading}
+                  >
+                    {busy ? <StopIcon /> : <MicIcon />}
+                    <span>{busy ? "Stop Mic" : "Start Mic"}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn capture-btn btn-secondary"
+                    onClick={() => fileInput.current?.click()}
+                    disabled={busy || uploading || demoPlaying}
+                  >
+                    <UploadIcon />
+                    <span>{uploading ? "Parsing…" : "Upload File"}</span>
+                  </button>
+
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    accept=".wav,.mp3,.m4a,.flac,.ogg,.opus,.mp4,.webm,.mkv,audio/*,video/*"
+                    hidden
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = "";
+                      if (file) void handleUpload(file);
+                    }}
+                  />
+                </div>
+
+                <div className="session-status-card">
+                  <div className="status-indicator">
+                    <span className={`status-dot ${busy ? "active" : ""}`} />
+                    <span>{sessionLabel}</span>
+                  </div>
+                  {asr && (
+                    <span className="badge">
+                      {asr.model} · {asr.compute_type}
+                    </span>
+                  )}
+                </div>
+
+                {captionError && (
+                  <div className="inline-warning error">
+                    <WarningIcon />
+                    <span>{captionError}</span>
+                  </div>
+                )}
+                {uploadInfo && (
+                  <div className="badge" style={{ fontSize: "0.72rem", padding: "4px 8px", width: "100%", justifyContent: "center" }}>
+                    {uploadInfo}
+                  </div>
+                )}
+                {uploadError && (
+                  <div className="inline-warning error">
+                    <WarningIcon />
+                    <span>{uploadError}</span>
+                  </div>
+                )}
+                {demoError && (
+                  <div className="inline-warning error">
+                    <WarningIcon />
+                    <span>{demoError}</span>
+                  </div>
+                )}
               </div>
+            </section>
+
+            {/* Curriculum & Syllabus Navigation */}
+            <CurriculumPanel
+              config={config}
+              classLevel={classLevel}
+              subject={subject}
+              onSelect={handleSelect}
+              syllabus={notes?.curriculum ?? null}
+              demo={demo}
+              demoPlaying={demoPlaying}
+              demoLoading={demoLoading}
+              onPlayDemo={playDemo}
+              onStopDemo={stopDemo}
+              onSelectNcertUnit={loadNcertUnit}
+              activeNcertUnit={activeNcertUnit}
+            />
+          </aside>
+
+          {/* Central Workspace: Live Transcript + Notes Split */}
+          <main className="workspace">
+            <CaptionPane
+              finals={finals}
+              partial={partial}
+              phase={phase}
+              onClear={handleClear}
+              onGenerate={generate}
+              generatingNotes={notesLoading}
+              hasNotes={notes !== null}
+            />
+            <NotesPane
+              notes={notes}
+              markdown={markdown}
+              loading={notesLoading}
+              error={notesError}
+              hasLines={finals.length > 0}
+              finalsCount={finals.length}
+              onGenerate={generate}
+              onSelectNcertUnit={loadNcertUnit}
+              activeNcertUnit={activeNcertUnit}
+              onStartMic={startMic}
+              onPlayDemo={playDemo}
+              isExpanded={notesExpanded}
+              onToggleExpand={() => setNotesExpanded((prev) => !prev)}
+              mappedTopic={mappedTopic}
+              chapterNumber={chapterNumber}
+              classLevel={classLevel}
+              subject={subject}
+            />
+          </main>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------------ System Settings Modal */}
+      {showSettings && (
+        <div className="modal-overlay" onClick={() => setShowSettings(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <header className="modal-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <SettingsIcon />
+                <h3>System &amp; Model Architecture</h3>
+              </div>
+              <button
+                type="button"
+                className="btn-icon"
+                onClick={() => setShowSettings(false)}
+                aria-label="Close"
+              >
+                <XIcon />
+              </button>
             </header>
 
-            <div className="control-body">
-              <div className="button-row">
-                <button
-                  type="button"
-                  className={`btn ${busy ? "danger" : "primary"}`}
-                  onClick={busy ? stop : startMic}
-                  disabled={demoPlaying || uploading}
-                >
-                  {busy ? <StopIcon /> : <MicIcon />}
-                  {busy ? "Stop session" : "Start microphone"}
-                </button>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => fileInput.current?.click()}
-                  disabled={busy || uploading || demoPlaying}
-                >
-                  <UploadIcon />
-                  {uploading ? "Transcribing…" : "Upload audio or video"}
-                </button>
-                <input
-                  ref={fileInput}
-                  type="file"
-                  accept=".wav,.mp3,.m4a,.flac,.ogg,.opus,.mp4,.webm,.mkv,audio/*,video/*"
-                  hidden
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    event.target.value = "";
-                    if (file) void handleUpload(file);
-                  }}
-                />
-              </div>
-
-              <div className="field">
-                <label htmlFor="notes-profile">Notes model</label>
+            <div className="modal-body">
+              <div className="setting-item">
+                <span className="setting-label">Notes Generation LLM</span>
                 <select
-                  id="notes-profile"
                   className="select"
                   value={profile}
-                  onChange={(event) => setProfile(event.target.value)}
+                  onChange={(e) => setProfile(e.target.value)}
+                  style={{ width: "100%" }}
                 >
                   {["extractive", "auto", "potato", "balanced", "full"].map((value) => (
                     <option key={value} value={value}>
@@ -561,131 +661,53 @@ export function App() {
                     </option>
                   ))}
                 </select>
+                <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: "4px" }}>
+                  Active model: {config?.notes.model ?? "Qwen 3.5 2B"} ({config?.notes.size_mb ?? 0} MB, {config?.notes.threads ?? 4} threads)
+                </span>
               </div>
 
-              <div className="session-note">
-                <span className={`status-light ${lightClass}`} />
-                <span>{sessionLabel}</span>
-                {asr ? (
-                  <span className="session-detail">
-                    {asr.model} · {asr.compute_type}
-                  </span>
-                ) : null}
+              <div className="setting-item">
+                <span className="setting-label">Speech Recognition Engine (ASR)</span>
+                <div className="setting-value-box">
+                  <span>faster-whisper</span>
+                  <span className="badge">{config?.asr.model ?? "base.en"} · {config?.asr.device ?? "cpu"}</span>
+                </div>
               </div>
 
-              {captionError ? (
-                <div className="inline-warning error flush">
-                  <WarningIcon />
-                  <span>{captionError}</span>
+              <div className="setting-item">
+                <span className="setting-label">Syllabus Retrieval &amp; Grounding</span>
+                <div className="setting-value-box">
+                  <span>Hybrid BM25 + Embeddings</span>
+                  <span className="badge badge-accent">100% On-Device</span>
                 </div>
-              ) : null}
-              {uploadError ? (
-                <div className="inline-warning error flush">
-                  <WarningIcon />
-                  <span>{uploadError}</span>
-                </div>
-              ) : null}
-              {demoError ? (
-                <div className="inline-warning error flush">
-                  <WarningIcon />
-                  <span>{demoError}</span>
-                </div>
-              ) : null}
-              {uploadInfo ? <p className="notice upload-info">{uploadInfo}</p> : null}
+              </div>
 
-              {config ? (
-                config.notes.available ? (
-                  <p className="notice">
-                    Notes model ready: <strong>{config.notes.model}</strong> ·{" "}
-                    {config.notes.size_mb} MB · {config.notes.threads} threads.
-                  </p>
-                ) : (
-                  <p className="notice">
-                    No notes model loaded — notes fall back to TextRank. Run{" "}
-                    <code>ila download-llm</code> to enable the local writer.
-                  </p>
-                )
-              ) : null}
+              <div className="setting-item">
+                <span className="setting-label">Data Persistence</span>
+                <div className="setting-value-box">
+                  <span>Local SQLite Database</span>
+                  <span className="badge badge-success">Schema v1</span>
+                </div>
+              </div>
 
-              <div className="demo-meta">
-                {demo ? (
-                  <>
-                    <strong>{demo.title}</strong>
-                    <span>
-                      {demo.chapter} · Class {demo.class_level}{" "}
-                      {config?.curriculum.subject_labels[demo.subject] ?? demo.subject}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <strong>Built-in NCERT demos</strong>
-                    <span>
-                      Six lectures, one per class and subject. Replay is client-side and
-                      needs no microphone.
-                    </span>
-                  </>
-                )}
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "10px" }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowSettings(false)}
+                >
+                  Close Settings
+                </button>
               </div>
             </div>
-          </section>
-
-          <CurriculumPanel
-            config={config}
-            classLevel={classLevel}
-            subject={subject}
-            onSelect={handleSelect}
-            syllabus={notes?.curriculum ?? null}
-            demo={demo}
-            demoPlaying={demoPlaying}
-            demoLoading={demoLoading}
-            onPlayDemo={playDemo}
-            onStopDemo={stopDemo}
-            onSelectNcertUnit={loadNcertUnit}
-            activeNcertUnit={activeNcertUnit}
-          />
-        </aside>
-
-        <main className="workspace">
-          <CaptionPane
-            finals={finals}
-            partial={partial}
-            phase={phase}
-            onClear={handleClear}
-            onGenerate={generate}
-            generatingNotes={notesLoading}
-            hasNotes={notes !== null}
-          />
-          <NotesPane
-            notes={notes}
-            markdown={markdown}
-            loading={notesLoading}
-            error={notesError}
-            hasLines={finals.length > 0}
-            finalsCount={finals.length}
-            onGenerate={generate}
-            onSelectNcertUnit={loadNcertUnit}
-            activeNcertUnit={activeNcertUnit}
-            onStartMic={startMic}
-            onPlayDemo={playDemo}
-            isExpanded={notesExpanded}
-            onToggleExpand={() => setNotesExpanded((prev) => !prev)}
-            mappedTopic={mappedTopic}
-            chapterNumber={chapterNumber}
-            classLevel={classLevel}
-            subject={subject}
-          />
-        </main>
-      </div>
+          </div>
+        </div>
       )}
 
+      {/* ------------------------------------------------------------------ Global Footer Bar */}
       <footer className="footer-bar">
-        <span>
-          <strong>Offline Intelligent Lecture Assistant</strong> · SDG 4 · Team 9
-        </span>
-        <span>
-          faster-whisper · llama.cpp · React
-          {config ? ` · v${config.version}` : ""}
-        </span>
+        <span>Offline Intelligent Lecture Assistant · SDG 4 Education · Team 9</span>
+        <span>faster-whisper · llama.cpp · SQLite {config ? `· v${config.version}` : ""}</span>
       </footer>
     </div>
   );

@@ -5,9 +5,17 @@ import { getNcertUnitNote } from "../api";
 import type { NcertNoteDetail, NcertPage } from "../types";
 import {
   CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   CopyIcon,
   DownloadIcon,
+  FileTextIcon,
+  MaximizeIcon,
+  MinimizeIcon,
+  PrinterIcon,
   WarningIcon,
+  ZoomInIcon,
+  ZoomOutIcon,
 } from "./icons";
 
 interface PdfNotesViewerProps {
@@ -137,57 +145,64 @@ export function PdfNotesViewer({ initialUnit = 1 }: PdfNotesViewerProps) {
       <header className="pdf-toolbar">
         {/* Left Section: Unit Selectors */}
         <div className="toolbar-group unit-selector-group">
-          <span className="toolbar-label">NCERT Class 10:</span>
-          <button
-            type="button"
-            className={`tab-pill ${currentUnit === 1 ? "active" : ""}`}
-            onClick={() => setCurrentUnit(1)}
-          >
-            Unit 1: Real Numbers
-          </button>
-          <button
-            type="button"
-            className={`tab-pill ${currentUnit === 2 ? "active" : ""}`}
-            onClick={() => setCurrentUnit(2)}
-          >
-            Unit 2: Polynomials
-          </button>
-          <button
-            type="button"
-            className={`tab-pill ${currentUnit === 3 ? "active" : ""}`}
-            onClick={() => setCurrentUnit(3)}
-          >
-            Unit 3: Linear Equations
-          </button>
+          <span style={{ fontSize: "0.76rem", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase" }}>
+            NCERT Class 10:
+          </span>
+          <div className="segmented">
+            <button
+              type="button"
+              className={`segmented-btn ${currentUnit === 1 ? "active" : ""}`}
+              onClick={() => setCurrentUnit(1)}
+            >
+              Unit 1: Real Numbers
+            </button>
+            <button
+              type="button"
+              className={`segmented-btn ${currentUnit === 2 ? "active" : ""}`}
+              onClick={() => setCurrentUnit(2)}
+            >
+              Unit 2: Polynomials
+            </button>
+            <button
+              type="button"
+              className={`segmented-btn ${currentUnit === 3 ? "active" : ""}`}
+              onClick={() => setCurrentUnit(3)}
+            >
+              Unit 3: Linear Equations
+            </button>
+          </div>
         </div>
 
         {/* Center Section: Page Navigation & Zoom */}
         <div className="toolbar-group page-controls">
           <button
             type="button"
-            className="icon-btn-pdf"
+            className="btn btn-ghost btn-sm"
             onClick={() => setShowSidebar(!showSidebar)}
-            title="Toggle Page Thumbnails Outline"
+            title="Toggle Outline Sidebar"
           >
-            📑 Outline
+            <FileTextIcon />
+            <span>Outline</span>
           </button>
 
           <span className="divider" />
 
           <button
             type="button"
-            className="icon-btn-pdf"
+            className="btn-icon"
             disabled={currentPage <= 1}
             onClick={() => scrollToPage(Math.max(1, currentPage - 1))}
             title="Previous Page"
+            aria-label="Previous Page"
           >
-            ◀
+            <ChevronLeftIcon />
           </button>
-          <div className="page-indicator">
+          <div className="page-indicator" style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <select
               value={currentPage}
               onChange={(e) => scrollToPage(Number(e.target.value))}
-              className="page-select"
+              className="select"
+              style={{ padding: "4px 8px", fontSize: "0.78rem" }}
             >
               {pages.map((p) => (
                 <option key={p.page_number} value={p.page_number}>
@@ -195,25 +210,26 @@ export function PdfNotesViewer({ initialUnit = 1 }: PdfNotesViewerProps) {
                 </option>
               ))}
             </select>
-            <span className="total-pages-label">of {totalPages}</span>
+            <span style={{ fontSize: "0.76rem", color: "var(--text-muted)" }}>of {totalPages}</span>
           </div>
           <button
             type="button"
-            className="icon-btn-pdf"
+            className="btn-icon"
             disabled={currentPage >= totalPages}
             onClick={() => scrollToPage(Math.min(totalPages, currentPage + 1))}
             title="Next Page"
+            aria-label="Next Page"
           >
-            ▶
+            <ChevronRightIcon />
           </button>
 
           <span className="divider" />
 
           {/* View mode toggle */}
-          <div className="mode-toggle">
+          <div className="segmented">
             <button
               type="button"
-              className={`toggle-btn ${viewMode === "continuous" ? "active" : ""}`}
+              className={`segmented-btn ${viewMode === "continuous" ? "active" : ""}`}
               onClick={() => setViewMode("continuous")}
               title="Continuous Scroll Mode"
             >
@@ -221,7 +237,7 @@ export function PdfNotesViewer({ initialUnit = 1 }: PdfNotesViewerProps) {
             </button>
             <button
               type="button"
-              className={`toggle-btn ${viewMode === "single" ? "active" : ""}`}
+              className={`segmented-btn ${viewMode === "single" ? "active" : ""}`}
               onClick={() => setViewMode("single")}
               title="Single Page Mode"
             >
@@ -234,24 +250,28 @@ export function PdfNotesViewer({ initialUnit = 1 }: PdfNotesViewerProps) {
           {/* Zoom controls */}
           <button
             type="button"
-            className="icon-btn-pdf"
+            className="btn-icon"
             onClick={() => setZoomLevel((z) => Math.max(60, z - 15))}
             title="Zoom Out"
+            aria-label="Zoom Out"
           >
-            🔍 -
+            <ZoomOutIcon />
           </button>
-          <span className="zoom-text">{zoomLevel}%</span>
+          <span style={{ fontSize: "0.76rem", color: "var(--text-secondary)", minWidth: 36, textAlign: "center" }}>
+            {zoomLevel}%
+          </span>
           <button
             type="button"
-            className="icon-btn-pdf"
+            className="btn-icon"
             onClick={() => setZoomLevel((z) => Math.min(160, z + 15))}
             title="Zoom In"
+            aria-label="Zoom In"
           >
-            🔍 +
+            <ZoomInIcon />
           </button>
           <button
             type="button"
-            className="icon-btn-pdf"
+            className="btn btn-ghost btn-sm"
             onClick={() => setZoomLevel(100)}
             title="Reset Zoom"
           >
@@ -263,37 +283,39 @@ export function PdfNotesViewer({ initialUnit = 1 }: PdfNotesViewerProps) {
         <div className="toolbar-group right-actions">
           <button
             type="button"
-            className="pdf-action-btn print-btn"
+            className="btn btn-secondary btn-sm"
             onClick={handlePrint}
             title="Print or Save as authentic PDF"
           >
-            🖨️ Print / Save PDF
+            <PrinterIcon />
+            <span>Print / PDF</span>
           </button>
           <button
             type="button"
-            className="pdf-action-btn"
+            className="btn btn-ghost btn-sm"
             onClick={handleCopy}
             title="Copy Markdown"
           >
             {copied ? <CheckIcon /> : <CopyIcon />}
-            {copied ? "Copied" : "Copy"}
+            <span>{copied ? "Copied" : "Copy"}</span>
           </button>
           <button
             type="button"
-            className="pdf-action-btn"
+            className="btn btn-ghost btn-sm"
             onClick={handleDownload}
             title="Download Notes Markdown"
           >
             <DownloadIcon />
-            Download
+            <span>Download</span>
           </button>
           <button
             type="button"
-            className="icon-btn-pdf"
+            className="btn-icon"
             onClick={toggleFullscreen}
             title="Toggle Fullscreen"
+            aria-label="Toggle Fullscreen"
           >
-            ⛶
+            {fullscreen ? <MinimizeIcon /> : <MaximizeIcon />}
           </button>
         </div>
       </header>

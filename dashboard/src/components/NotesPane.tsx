@@ -8,7 +8,10 @@ import {
   CheckIcon,
   CopyIcon,
   DownloadIcon,
+  FileTextIcon,
+  MaximizeIcon,
   MicIcon,
+  MinimizeIcon,
   PlayIcon,
   SparkIcon,
   WarningIcon,
@@ -39,22 +42,19 @@ const UNITS = [
     id: 1,
     title: "Unit 1: Real Numbers",
     sub: "NCERT Class 10 · Chapter 1 · jemh101.pdf · 10 Pages",
-    topics: "Fundamental Theorem of Arithmetic, HCF & LCM, Proofs of Irrationality (√2, √3, √5)",
-    wordCount: "3,720 words",
+    topics: "Fundamental Theorem of Arithmetic, HCF & LCM, Proofs of Irrationality",
   },
   {
     id: 2,
     title: "Unit 2: Polynomials",
     sub: "NCERT Class 10 · Chapter 2 · jemh102.pdf · 10 Pages",
-    topics: "Geometrical Zeroes, Parabola Properties, Quadratic & Cubic Zero-Coefficient Relationships",
-    wordCount: "3,507 words",
+    topics: "Geometrical Zeroes, Parabola Properties, Quadratic & Cubic Relationships",
   },
   {
     id: 3,
     title: "Unit 3: Pair of Linear Equations",
     sub: "NCERT Class 10 · Chapter 3 · jemh103.pdf · 10 Pages",
-    topics: "Consistency Ratios (a1/a2 ≠ b1/b2), Elimination, Substitution, HOTS Word Problems",
-    wordCount: "3,888 words",
+    topics: "Consistency Ratios (a1/a2 ≠ b1/b2), Elimination, Substitution",
   },
 ];
 
@@ -100,12 +100,9 @@ export function NotesPane({
   const [storedLectureNote, setStoredLectureNote] = useState<StoredLectureNotesResponse | null>(null);
   const [selectedPage, setSelectedPage] = useState<"all" | number>("all");
   const [copied, setCopied] = useState<boolean>(false);
-  const [unitsCollapsed, setUnitsCollapsed] = useState<boolean>(false);
-  const [bottomExpanded, setBottomExpanded] = useState<boolean>(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Sync with prop when parent changes active unit
   useEffect(() => {
     if (activeNcertUnit && activeNcertUnit !== selectedUnit) {
       setSelectedUnit(activeNcertUnit);
@@ -224,248 +221,185 @@ export function NotesPane({
   };
 
   const pages = textbookData?.pages || [];
-  const currentUnitInfo = UNITS.find((u) => u.id === selectedUnit) || UNITS[0];
 
   return (
-    <section className={`panel notes-panel ${bottomExpanded ? "bottom-expanded" : ""}`} ref={containerRef}>
-      {/* Top Header */}
+    <section className="panel notes-panel" ref={containerRef}>
+      {/* Panel Top Header */}
       <header className="panel-header">
-        <div>
-          <p className="panel-kicker">Grounded study material · NCERT Class 10</p>
-          <h2>Study Notes &amp; Textbook Guides</h2>
+        <div className="panel-title-group">
+          <span className="panel-kicker">Grounded NCERT Curriculum</span>
+          <h2>Study Notes &amp; Guides</h2>
         </div>
+
         <div className="panel-actions">
           {onToggleExpand && (
             <button
               type="button"
-              className={`icon-btn expand-notes-btn ${isExpanded ? "active" : ""}`}
+              className="btn btn-sm btn-secondary"
               onClick={onToggleExpand}
-              title={isExpanded ? "Collapse notes panel (3-column view)" : "Expand notes panel (Full width study mode)"}
-              aria-label={isExpanded ? "Collapse notes" : "Expand notes"}
+              title={isExpanded ? "Restore default 3-column view" : "Expand notes view to full width"}
             >
-              <span className="expand-icon">{isExpanded ? "⤓" : "⛶"}</span>
-              <span className="expand-text">{isExpanded ? "Collapse" : "Expand"}</span>
+              {isExpanded ? <MinimizeIcon /> : <MaximizeIcon />}
+              <span>{isExpanded ? "Collapse" : "Expand"}</span>
             </button>
           )}
+
           <button
             type="button"
-            className="icon-btn"
+            className="btn-icon"
             onClick={handleCopyCurrent}
-            title="Copy Markdown"
+            title="Copy Markdown to Clipboard"
             aria-label="Copy Markdown"
           >
             {copied ? <CheckIcon /> : <CopyIcon />}
           </button>
+
           <button
             type="button"
-            className="icon-btn"
+            className="btn-icon"
             onClick={handleDownloadCurrent}
-            title="Download Markdown"
+            title="Download Notes Markdown"
             aria-label="Download Markdown"
           >
             <DownloadIcon />
           </button>
+
           <button
             type="button"
-            className="icon-btn"
+            className="btn-icon"
             onClick={() => window.print()}
-            title="Print / Save PDF"
-            aria-label="Print / Save PDF"
+            title="Print or Export to PDF"
+            aria-label="Print"
           >
             🖨️
           </button>
+
           {hasLines && (
             <button
               type="button"
-              className="btn primary compact generate-notes-btn"
+              className="btn btn-primary btn-sm"
               onClick={onGenerate}
               disabled={transcriptLoading}
-              title="Convert live transcript to grounded NCERT notes"
+              title="Convert live transcript into syllabus-grounded notes"
             >
               <SparkIcon />
-              <span>{transcriptLoading ? "Writing…" : notes ? "Regenerate" : "Convert transcript"}</span>
+              <span>{transcriptLoading ? "Writing…" : notes ? "Regenerate" : "Generate Notes"}</span>
             </button>
           )}
         </div>
       </header>
 
-      {/* Clean Organized Unit List with Collapse/Expand Toggle */}
-      <div className={`unit-list-container ${unitsCollapsed || bottomExpanded ? "collapsed" : ""}`}>
-        <div className="unit-list-header">
-          <div className="unit-list-title-wrap">
-            <span className="unit-list-title">NCERT Class 10 Units</span>
-            {(unitsCollapsed || bottomExpanded) ? (
-              <span className="unit-compact-name">
-                Selected: Unit {selectedUnit} — {currentUnitInfo.title}
-              </span>
-            ) : (
-              <span className="unit-list-meta">10 Pages / Unit · Local LLM Grounded</span>
-            )}
-          </div>
-          <button
-            type="button"
-            className="btn-toggle-units-pill"
-            onClick={() => {
-              if (bottomExpanded) setBottomExpanded(false);
-              setUnitsCollapsed((prev) => !prev);
-            }}
-            title={unitsCollapsed || bottomExpanded ? "Show 3 unit cards" : "Collapse units to expand bottom reading area"}
-          >
-            {unitsCollapsed || bottomExpanded ? "▼ Expand Units List" : "▲ Collapse Units (Expand Notes)"}
-          </button>
+      {/* Sleek Compact Unit Selector */}
+      <div className="notes-sub-header">
+        <div className="unit-selector-chips">
+          {UNITS.map((u) => (
+            <button
+              key={u.id}
+              type="button"
+              className={`unit-chip ${selectedUnit === u.id ? "active" : ""}`}
+              onClick={() => handleUnitClick(u.id)}
+              title={u.topics}
+            >
+              Unit {u.id}: {u.title.replace(/^Unit \d+:\s*/, "")}
+            </button>
+          ))}
         </div>
 
-        {!(unitsCollapsed || bottomExpanded) ? (
-          <div className="unit-clean-cards">
-            {UNITS.map((u) => {
-              const isSelected = selectedUnit === u.id;
-              return (
-                <button
-                  key={u.id}
-                  type="button"
-                  className={`unit-clean-card ${isSelected ? "selected" : ""}`}
-                  onClick={() => handleUnitClick(u.id)}
-                >
-                  <div className="unit-clean-card-left">
-                    <span className="unit-pill">Unit {u.id}</span>
-                    <div className="unit-meta-texts">
-                      <strong className="unit-card-heading">{u.title}</strong>
-                      <span className="unit-card-sub">{u.topics}</span>
-                    </div>
-                  </div>
-                  <div className="unit-clean-card-right">
-                    <span className="unit-page-tag">10 Pages</span>
-                    {isSelected && <span className="unit-active-glow" />}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="unit-compact-chips-row">
-            {UNITS.map((u) => (
-              <button
-                key={u.id}
-                type="button"
-                className={`unit-compact-chip ${selectedUnit === u.id ? "active" : ""}`}
-                onClick={() => handleUnitClick(u.id)}
-                title={u.topics}
-              >
-                <span className="compact-chip-pill">Unit {u.id}</span>
-                <span>{u.title.replace(/^Unit \d+:\s*/, "")}</span>
-              </button>
-            ))}
-          </div>
+        {onSelectNcertUnit && (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => onSelectNcertUnit(selectedUnit)}
+            title="Open Dedicated Fullscreen 10-Page Reader View"
+            style={{ fontSize: "0.74rem" }}
+          >
+            <FileTextIcon />
+            <span>Full Reader View →</span>
+          </button>
         )}
       </div>
 
-      {/* Dual Tabs for Selected Unit: Textbook vs Transcript vs Both */}
-      <div className="notes-dual-tabs">
+      {/* Notes View Switcher (Textbook vs Transcript vs Both) */}
+      <div className="notes-nav-tabs">
         <button
           type="button"
-          className={`dual-tab-pill ${activeTab === "textbook" ? "active" : ""}`}
+          className={`notes-tab-btn ${activeTab === "textbook" ? "active" : ""}`}
           onClick={() => setActiveTab("textbook")}
         >
           <BookIcon />
-          <span>📘 Textbook Master Notes (10 Pages)</span>
-          <span className="tab-pill-badge ready">Ready</span>
+          <span>NCERT Master Guide (10 Pages)</span>
         </button>
+
         <button
           type="button"
-          className={`dual-tab-pill ${activeTab === "transcript" ? "active" : ""}`}
+          className={`notes-tab-btn ${activeTab === "transcript" ? "active" : ""}`}
           onClick={() => setActiveTab("transcript")}
         >
           <MicIcon />
-          <span>🎙️ Lecture Transcript Notes</span>
-          {notes || storedLectureNote?.found ? (
-            <span className="tab-pill-badge ready">Captured</span>
-          ) : hasLines ? (
-            <span className="tab-pill-badge ready">Ready</span>
-          ) : (
-            <span className="tab-pill-badge idle">Session</span>
+          <span>Lecture Transcript Notes</span>
+          {(notes || storedLectureNote?.found) && (
+            <span className="badge badge-success" style={{ height: 18, fontSize: "0.68rem" }}>Saved</span>
           )}
         </button>
+
         <button
           type="button"
-          className={`dual-tab-pill ${activeTab === "both" ? "active" : ""}`}
+          className={`notes-tab-btn ${activeTab === "both" ? "active" : ""}`}
           onClick={() => setActiveTab("both")}
         >
-          <span>📑 Both Notes</span>
+          <span>Combined Notes</span>
         </button>
       </div>
 
-      {/* Main Content Viewport */}
-      <div className="notes-body-viewport">
-        {/* ============================================================== */}
-        {/* TAB 1: TEXTBOOK MASTER NOTES (10-Page Comprehensive Guide)      */}
-        {/* ============================================================== */}
+      {/* Page Filter Bar (When Textbook Notes active) */}
+      {(activeTab === "textbook" || activeTab === "both") && (
+        <div className="page-filter-bar">
+          <div className="page-chip-list">
+            <span style={{ color: "var(--text-muted)", marginRight: 6 }}>Section Pages:</span>
+            <button
+              type="button"
+              className={`page-chip-btn ${selectedPage === "all" ? "active" : ""}`}
+              onClick={() => setSelectedPage("all")}
+            >
+              All 10 Pages
+            </button>
+            {pages.map((p) => (
+              <button
+                key={p.page_number}
+                type="button"
+                className={`page-chip-btn ${selectedPage === p.page_number ? "active" : ""}`}
+                onClick={() => setSelectedPage(p.page_number)}
+                title={`Section ${p.section_id}: ${p.title}`}
+              >
+                P{p.page_number}
+              </button>
+            ))}
+          </div>
+
+          <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>
+            10-Page Local LLM Grounded NCERT Guide
+          </span>
+        </div>
+      )}
+
+      {/* Main Content Reading Viewport */}
+      <div className="notes-content-viewport">
+        {/* TAB 1: TEXTBOOK MASTER NOTES */}
         {(activeTab === "textbook" || activeTab === "both") && (
-          <div className="textbook-view-container">
-            {activeTab === "both" && (
-              <div className="both-section-divider">
-                <BookIcon />
-                <span>📘 NCERT 10-Page Textbook Master Notes — {currentUnitInfo.title}</span>
-              </div>
-            )}
-
-            {/* Textbook Page Navigation Filter with Bottom-Expand & Full-Reader Buttons */}
-            <div className="textbook-page-bar">
-              <div className="page-bar-left">
-                <span className="page-bar-label">Page Filter:</span>
-                <button
-                  type="button"
-                  className={`page-chip ${selectedPage === "all" ? "active" : ""}`}
-                  onClick={() => setSelectedPage("all")}
-                >
-                  All 10 Pages
-                </button>
-                {pages.map((p) => (
-                  <button
-                    key={p.page_number}
-                    type="button"
-                    className={`page-chip ${selectedPage === p.page_number ? "active" : ""}`}
-                    onClick={() => setSelectedPage(p.page_number)}
-                    title={`Section ${p.section_id}: ${p.title}`}
-                  >
-                    Pg {p.page_number}
-                  </button>
-                ))}
-              </div>
-
-              <div className="page-bar-actions">
-                <button
-                  type="button"
-                  className={`bottom-expand-btn ${bottomExpanded ? "active" : ""}`}
-                  onClick={() => {
-                    const next = !bottomExpanded;
-                    setBottomExpanded(next);
-                    if (next) setUnitsCollapsed(true);
-                  }}
-                  title={bottomExpanded ? "Collapse notes area to normal height" : "Expand bottom reading area to full height"}
-                >
-                  <span className="expand-btn-icon">{bottomExpanded ? "⤓" : "⛶"}</span>
-                  <span>{bottomExpanded ? "Collapse View" : "Expand Bottom Part"}</span>
-                </button>
-                {onSelectNcertUnit && (
-                  <button
-                    type="button"
-                    className="open-full-reader-pill"
-                    onClick={() => onSelectNcertUnit(selectedUnit)}
-                    title="Open Dedicated 10-Page Master Reader screen"
-                  >
-                    <span>📑 Full Reader</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
+          <div>
             {textbookLoading ? (
-              <div className="notes-loading-card">
+              <div
+                style={{
+                  padding: 40,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 14,
+                  color: "var(--text-secondary)",
+                }}
+              >
                 <span className="spinner" />
-                <div>
-                  <strong>Loading Unit {selectedUnit} Master Notes…</strong>
-                  <p>Fetching on-device 10-page NCERT content generated with local LLM.</p>
-                </div>
+                <span>Loading Unit {selectedUnit} Master Notes from local storage…</span>
               </div>
             ) : textbookError ? (
               <div className="inline-warning error">
@@ -473,254 +407,210 @@ export function NotesPane({
                 <span>{textbookError}</span>
               </div>
             ) : textbookData ? (
-              <div className="textbook-pages-display">
+              <div>
                 {(selectedPage === "all"
                   ? pages
                   : pages.filter((p) => p.page_number === selectedPage)
                 ).map((page: NcertPage) => (
-                  <article key={page.page_number} className="textbook-doc-sheet">
-                    <div className="sheet-running-header">
-                      <div className="sheet-running-title-group">
-                        <span className="sheet-h-subject">NCERT Class 10 Mathematics</span>
-                        <span className="sheet-h-title">
-                          Unit {selectedUnit}: {currentUnitInfo.title}
-                        </span>
-                        <span className="sheet-h-page">
-                          Page {page.page_number} of {pages.length || 10}
-                        </span>
-                      </div>
-
-                      <div className="sheet-header-actions">
-                        <button
-                          type="button"
-                          className={`sheet-expand-pill ${bottomExpanded ? "active" : ""}`}
-                          onClick={() => {
-                            const next = !bottomExpanded;
-                            setBottomExpanded(next);
-                            if (next) setUnitsCollapsed(true);
-                          }}
-                          title={bottomExpanded ? "Exit expanded view" : "Expand bottom sheet to full height"}
-                        >
-                          {bottomExpanded ? "⤓ Normal" : "⛶ Expand Sheet"}
-                        </button>
-                        {onSelectNcertUnit && (
-                          <button
-                            type="button"
-                            className="sheet-full-reader-pill"
-                            onClick={() => onSelectNcertUnit(selectedUnit)}
-                            title="Open Dedicated 10-Page Reader Screen"
-                          >
-                            📑 Full Reader
-                          </button>
-                        )}
-                      </div>
+                  <article key={page.page_number} className="study-document-sheet">
+                    <div className="sheet-header-meta">
+                      <span>NCERT Class 10 Mathematics · Unit {selectedUnit}</span>
+                      <span>Page {page.page_number} of {pages.length || 10}</span>
                     </div>
 
-                    <div className="sheet-sec-badge">
-                      <span className="sec-tag">Section {page.section_id}</span>
-                      <h3 className="sec-title">{page.title}</h3>
+                    <div style={{ marginBottom: 16 }}>
+                      <span className="badge badge-accent" style={{ marginBottom: 6 }}>
+                        Section {page.section_id}
+                      </span>
+                      <h3 className="sheet-section-title">{page.title}</h3>
                     </div>
 
-                    <div className="sheet-markdown">
+                    <div className="markdown">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
                         {page.content}
                       </ReactMarkdown>
                     </div>
 
-                    <div className="sheet-running-footer">
-                      <span>Offline Intelligent Learning Assistant (ILA) · SDG 4</span>
-                      <span className="sheet-page-indicator">
-                        — Page {page.page_number} of {pages.length || 10} —
-                      </span>
-                      <span>CBSE / NCERT Standard</span>
+                    <div
+                      style={{
+                        marginTop: 24,
+                        paddingTop: 12,
+                        borderTop: "1px solid var(--border-subtle)",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: "0.72rem",
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      <span>Offline Intelligent Learning Assistant (ILA)</span>
+                      <span>CBSE / NCERT Syllabus Grounded</span>
                     </div>
                   </article>
                 ))}
               </div>
             ) : (
-              <div className="empty-state">
-                <p>No textbook notes found for Unit {selectedUnit}.</p>
-              </div>
+              <p style={{ textAlign: "center", color: "var(--text-muted)", padding: 40 }}>
+                No textbook notes available for Unit {selectedUnit}.
+              </p>
             )}
           </div>
         )}
 
-        {/* ============================================================== */}
-        {/* TAB 2: LECTURE TRANSCRIPT NOTES                                */}
-        {/* ============================================================== */}
+        {/* TAB 2: LECTURE TRANSCRIPT NOTES */}
         {(activeTab === "transcript" || activeTab === "both") && (
-          <div className="transcript-view-container">
-            {activeTab === "both" && (
-              <div className="both-section-divider">
-                <MicIcon />
-                <span>🎙️ Lecture Transcript Grounded Notes (Current Session)</span>
-              </div>
-            )}
-
-            {/* Transcript View Actions Toolbar */}
-            <div className="transcript-toolbar-row">
-              <button
-                type="button"
-                className={`bottom-expand-btn compact ${bottomExpanded ? "active" : ""}`}
-                onClick={() => {
-                  const next = !bottomExpanded;
-                  setBottomExpanded(next);
-                  if (next) setUnitsCollapsed(true);
-                }}
-                title={bottomExpanded ? "Collapse notes area" : "Expand lecture notes area to full height"}
-              >
-                <span className="expand-btn-icon">{bottomExpanded ? "⤓" : "⛶"}</span>
-                <span>{bottomExpanded ? "Collapse Height" : "Expand Bottom Part"}</span>
-              </button>
-            </div>
-
+          <div style={{ marginTop: activeTab === "both" ? 30 : 0 }}>
             {transcriptLoading ? (
-              <div className="notes-loading-card">
+              <div
+                style={{
+                  padding: 40,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 14,
+                  color: "var(--text-secondary)",
+                }}
+              >
                 <span className="spinner" />
-                <div>
-                  <strong>Synthesizing lecture notes…</strong>
-                  <p>
-                    TextRank extracts core utterances, local LLM rewrites them, and the
-                    syllabus correlation verifier grounds notes to NCERT topics.
-                  </p>
-                </div>
+                <span>Synthesizing notes and mapping to NCERT syllabus with local LLM…</span>
               </div>
             ) : transcriptError ? (
-              <div className="transcript-correlation-error-card">
-                <div className="error-card-header">
-                  <WarningIcon />
-                  <strong>Syllabus Correlation Error · Notes Dropped</strong>
-                </div>
-                <p className="error-card-message">{transcriptError}</p>
-                <div className="error-card-help">
-                  <span>💡 The lecture transcript was evaluated against NCERT syllabus topics. Off-topic talk or transcripts with insufficient correlation are rejected to protect grounded learning materials.</span>
+              <div className="inline-warning error" style={{ margin: "16px 0" }}>
+                <WarningIcon />
+                <div>
+                  <strong style={{ display: "block", marginBottom: 4 }}>
+                    Syllabus Correlation Error · Notes Dropped
+                  </strong>
+                  <p style={{ margin: 0, fontSize: "0.82rem", color: "#fecaca" }}>{transcriptError}</p>
                 </div>
               </div>
             ) : notes && markdown ? (
-              <div className="transcript-notes-content">
+              <article className="study-document-sheet">
                 {mappedTopic && (
-                  <div className="mapped-topic-banner">
-                    <div className="mapped-topic-info">
-                      <span className="mapped-topic-pill">Unit {chapterNumber ?? selectedUnit}</span>
-                      <div>
-                        <strong>Mapped Syllabus Chapter: {mappedTopic}</strong>
-                        <p>Verified against NCERT syllabus · Stored in SQLite database</p>
-                      </div>
+                  <div className="mapped-correlation-banner">
+                    <div>
+                      <span>Mapped NCERT Unit: </span>
+                      <strong>Unit {chapterNumber ?? selectedUnit}: {mappedTopic}</strong>
                     </div>
-                    <span className="mapped-topic-badge">✓ Stored in SQLite</span>
+                    <span className="badge badge-success">✓ Stored in SQLite</span>
                   </div>
                 )}
 
-                <div className="notes-meta">
-                  <span className={`chip ${notes.used_llm ? "chip-accent" : "chip-muted"}`}>
-                    {notes.used_llm ? <SparkIcon /> : null}
-                    {notes.used_llm
-                      ? `${notes.model ?? "local model"} · ${notes.profile}`
-                      : "Extractive · TextRank"}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 16,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <span className={`badge ${notes.used_llm ? "badge-accent" : ""}`}>
+                    {notes.used_llm ? `${notes.model ?? "local model"} · ${notes.profile}` : "Extractive TextRank"}
                   </span>
-                  <span className="chip">{notes.latency_s.toFixed(1)} s</span>
-                  <span className="chip">{notes.points.length} points</span>
-                  <span className="chip">{notes.sentences} sentences</span>
-                  {notes.dropped > 0 && (
-                    <span className="chip chip-warn">
-                      {notes.dropped} unsupported line{notes.dropped === 1 ? "" : "s"} dropped
-                    </span>
-                  )}
+                  <span className="badge">{notes.latency_s.toFixed(1)}s</span>
+                  <span className="badge">{notes.points.length} key points</span>
+                  <span className="badge">{notes.sentences} sentences</span>
                 </div>
 
-                {!notes.used_llm && notes.fallback_reason && (
-                  <div className="inline-warning">
-                    <WarningIcon />
-                    <span>
-                      <strong>Extractive fallback.</strong> {notes.fallback_reason}
-                    </span>
-                  </div>
-                )}
-
-                <div className="markdown transcript-markdown">
+                <div className="markdown">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
                 </div>
-              </div>
+              </article>
             ) : storedLectureNote?.found && storedLectureNote.markdown ? (
-              <div className="transcript-notes-content">
-                <div className="mapped-topic-banner stored-history">
-                  <div className="mapped-topic-info">
-                    <span className="mapped-topic-pill">Unit {storedLectureNote.chapter_number ?? selectedUnit}</span>
-                    <div>
-                      <strong>Stored Lecture Notes: {storedLectureNote.topic ?? storedLectureNote.title}</strong>
-                      <p>Retrieved from SQLite database ({storedLectureNote.created_at ? new Date(storedLectureNote.created_at).toLocaleDateString() : "Saved Lecture"})</p>
-                    </div>
+              <article className="study-document-sheet">
+                <div className="mapped-correlation-banner">
+                  <div>
+                    <span>Previous Session: </span>
+                    <strong>Unit {storedLectureNote.chapter_number ?? selectedUnit}: {storedLectureNote.topic ?? storedLectureNote.title}</strong>
                   </div>
-                  <span className="mapped-topic-badge stored">💾 Stored in SQLite</span>
+                  <span className="badge badge-success">Stored in SQLite</span>
                 </div>
 
-                <div className="markdown transcript-markdown">
+                <div className="markdown">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{storedLectureNote.markdown}</ReactMarkdown>
                 </div>
-              </div>
+              </article>
             ) : hasLines ? (
-              <div className="transcript-convert-prompt-card">
-                <div className="prompt-card-icon">
+              <div
+                style={{
+                  padding: "36px 24px",
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border-default)",
+                  borderRadius: "var(--radius-lg)",
+                  textAlign: "center",
+                  maxWidth: 500,
+                  margin: "20px auto",
+                }}
+              >
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: "var(--radius-md)",
+                    background: "var(--accent-subtle)",
+                    color: "var(--accent-text)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "0 auto 14px",
+                  }}
+                >
                   <SparkIcon />
                 </div>
-                <div className="prompt-card-body">
-                  <h3>Live Lecture Transcript Ready for Conversion</h3>
-                  <p>
-                    {finalsCount > 0 ? `${finalsCount} speech utterances` : "Captured lecture utterances"} ready to synthesize into structured, syllabus-grounded notes mapped to NCERT units.
-                  </p>
-                  <button
-                    type="button"
-                    className="btn primary"
-                    onClick={onGenerate}
-                    disabled={transcriptLoading}
-                  >
-                    <SparkIcon />
-                    {transcriptLoading ? "Writing Notes with Local LLM…" : "Convert Transcript to Notes"}
-                  </button>
-                </div>
+                <h3 style={{ fontSize: "1.05rem", marginBottom: 6, color: "var(--text-primary)" }}>
+                  Transcript Ready for Synthesis
+                </h3>
+                <p style={{ fontSize: "0.84rem", color: "var(--text-secondary)", marginBottom: 18 }}>
+                  {finalsCount > 0 ? `${finalsCount} speech utterances captured` : "Spoken lecture audio captured"}.
+                  Synthesize into structured NCERT notes mapped to your syllabus.
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={onGenerate}
+                  disabled={transcriptLoading}
+                >
+                  <SparkIcon />
+                  <span>Synthesize Notes Now</span>
+                </button>
               </div>
             ) : (
-              <div className="transcript-empty-card">
-                <div className="empty-icon-wrap">
+              <div
+                style={{
+                  padding: "40px 20px",
+                  textAlign: "center",
+                  color: "var(--text-muted)",
+                }}
+              >
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: "var(--radius-md)",
+                    background: "var(--bg-surface-subtle)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "0 auto 12px",
+                    color: "var(--text-secondary)",
+                  }}
+                >
                   <MicIcon />
                 </div>
-                <h3>Live Lecture Notes for {currentUnitInfo.title}</h3>
-                <p>
-                  No spoken audio recorded yet for this session. The complete, rigorous
-                  10-page NCERT Study Guide is available right now in the{" "}
-                  <strong>Textbook Master Notes</strong> tab!
+                <h4 style={{ fontSize: "0.95rem", color: "var(--text-primary)", marginBottom: 4 }}>
+                  No Spoken Lecture Recorded Yet
+                </h4>
+                <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", maxWidth: 360, margin: "0 auto 16px" }}>
+                  Start your microphone or replay an official NCERT demo lecture to synthesize lecture notes.
                 </p>
-                <p className="empty-subtext">
-                  To capture and ground live lecture audio, start your microphone or replay
-                  an official NCERT demo lecture.
-                </p>
-                <div className="empty-action-buttons">
-                  <button
-                    type="button"
-                    className="btn primary"
-                    onClick={onStartMic}
-                    title="Start capturing microphone audio"
-                  >
+                <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={onStartMic}>
                     <MicIcon />
-                    Start microphone
+                    <span>Start Microphone</span>
                   </button>
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={onPlayDemo}
-                    title="Replay a built-in Class 10 NCERT lecture"
-                  >
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={onPlayDemo}>
                     <PlayIcon />
-                    Play Class 10 Demo
-                  </button>
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    onClick={() => setActiveTab("textbook")}
-                    title="Read pre-generated 10-page textbook study guide"
-                  >
-                    <BookIcon />
-                    View Unit {selectedUnit} Textbook Notes
+                    <span>Play Demo</span>
                   </button>
                 </div>
               </div>

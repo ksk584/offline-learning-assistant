@@ -21,7 +21,18 @@ import type {
   RemediationAnswerResult,
   RemediationPack,
 } from "../types";
-import { BookIcon, CheckIcon, PlayIcon, SparkIcon, WarningIcon } from "./icons";
+import {
+  ArrowRightIcon,
+  AwardIcon,
+  BarChartIcon,
+  BookIcon,
+  CheckCircleIcon,
+  CheckIcon,
+  PlayIcon,
+  SparkIcon,
+  WarningIcon,
+  XIcon,
+} from "./icons";
 
 interface QuizPaneProps {
   classLevel: number;
@@ -419,19 +430,19 @@ export function QuizPane({
     <section className="panel study-panel quiz-pane" ref={containerRef}>
       <header className="panel-header">
         <div>
-          <p className="panel-kicker">Adaptive practice · mastery in SQLite</p>
-          <h2>Practice quiz</h2>
+          <p className="panel-kicker">Adaptive Practice · SQLite Storage</p>
+          <h2>Adaptive Quizzes &amp; Auto-Remediation</h2>
         </div>
         <div className="panel-actions">
-          <span className="chip chip-accent">
+          <span className="badge badge-accent">
             <SparkIcon />
             {isMath
               ? "Class 10 Mathematics (14 Textbooks)"
               : (courseLabel ?? `Class ${classLevel} ${subjectLabel}`)}
           </span>
           {active ? (
-            <button type="button" className="btn ghost compact" onClick={endQuiz}>
-              End quiz
+            <button type="button" className="btn btn-ghost btn-sm" onClick={endQuiz}>
+              End Quiz
             </button>
           ) : null}
         </div>
@@ -439,32 +450,22 @@ export function QuizPane({
 
       <div className="study-body">
         {/* Subject Switcher Bar */}
-        <div
-          style={{
-            display: "flex",
-            gap: "8px",
-            marginBottom: "16px",
-            background: "rgba(5, 8, 17, 0.9)",
-            padding: "6px",
-            borderRadius: "12px",
-            border: "1px solid rgba(37, 99, 235, 0.25)",
-          }}
-        >
+        <div className="segmented" style={{ marginBottom: "16px" }}>
           <button
             type="button"
-            className={`btn ${isMath ? "primary" : "ghost"}`}
-            style={{ flex: 1, padding: "8px 14px", fontSize: "0.85rem", fontWeight: 700 }}
+            className={`segmented-btn ${isMath ? "active" : ""}`}
             onClick={() => handleSwitchSubject("maths")}
           >
-            📘 Class 10 Mathematics (NCERT Textbooks)
+            <BookIcon />
+            <span>Class 10 Mathematics (NCERT)</span>
           </button>
           <button
             type="button"
-            className={`btn ${!isMath ? "primary" : "ghost"}`}
-            style={{ flex: 1, padding: "8px 14px", fontSize: "0.85rem", fontWeight: 700 }}
+            className={`segmented-btn ${!isMath ? "active" : ""}`}
             onClick={() => handleSwitchSubject("science")}
           >
-            🔬 Class 10 Science (Demo Lecture)
+            <SparkIcon />
+            <span>Class 10 Science (Demo Lecture)</span>
           </button>
         </div>
         {remediationError ? (
@@ -484,115 +485,56 @@ export function QuizPane({
             </div>
           </div>
         ) : remediationPack ? (
-          <div
-            className="remediation-drill-container"
-            style={{
-              background: "rgba(11, 19, 43, 0.95)",
-              border: "1px solid rgba(59, 130, 246, 0.4)",
-              borderRadius: "12px",
-              padding: "24px",
-              marginBottom: "24px",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                marginBottom: "16px",
-                borderBottom: "1px solid rgba(59, 130, 246, 0.2)",
-                paddingBottom: "12px",
-              }}
-            >
+          <div className="remediation-drill-card">
+            <div className="remediation-header">
               <div>
-                <span
-                  className="chip"
-                  style={{
-                    background: "rgba(37, 99, 235, 0.25)",
-                    color: "#93c5fd",
-                    border: "1px solid #2563eb",
-                    fontWeight: 700,
-                    marginBottom: "6px",
-                  }}
-                >
-                  🎯 Auto-Remediation Drill · Closing Knowledge Gaps
-                </span>
-                <h3 style={{ margin: "6px 0 2px 0", fontSize: "1.25rem", color: "#f8fafc" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <span className="badge badge-accent">
+                    <SparkIcon />
+                    <span>Auto-Remediation Drill</span>
+                  </span>
+                  <span className="badge">Student: {remediationPack.student_id}</span>
+                </div>
+                <h3 style={{ margin: "4px 0", fontSize: "1.15rem", color: "var(--text-primary)" }}>
                   {remediationPack.topic}
                 </h3>
-                <span style={{ fontSize: "0.8rem", color: "#94a3b8" }}>
-                  Powered by Local Qwen 3.5 LLM · Grounded on NCERT Textbooks · Student:{" "}
-                  <strong>{remediationPack.student_id}</strong>
+                <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                  Powered by Local Qwen 3.5 LLM · Grounded on NCERT Textbooks
                 </span>
               </div>
               <button
                 type="button"
-                className="btn ghost compact"
+                className="btn btn-ghost btn-sm"
                 onClick={handleCloseRemediation}
               >
-                ✕ Close Drill
+                <XIcon />
+                <span>Close Drill</span>
               </button>
             </div>
 
             {/* Conceptual Foundation Primer */}
-            <div
-              style={{
-                background: "rgba(15, 23, 42, 0.8)",
-                borderLeft: "4px solid #3b82f6",
-                padding: "14px 18px",
-                borderRadius: "4px 8px 8px 4px",
-                marginBottom: "20px",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "6px",
-                }}
-              >
+            <div className="remediation-primer-box">
+              <strong>
                 <SparkIcon />
-                <strong style={{ color: "#60a5fa", fontSize: "0.9rem" }}>
-                  Core Concept Primer (NCERT Textbooks):
-                </strong>
-              </div>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "0.88rem",
-                  lineHeight: 1.6,
-                  color: "#e2e8f0",
-                }}
-              >
-                {remediationPack.primer}
-              </p>
+                <span>Core Concept Primer (NCERT Textbooks):</span>
+              </strong>
+              <p>{remediationPack.primer}</p>
             </div>
 
             {remediationCompleted ? (
-              <div style={{ textAlign: "center", padding: "24px 12px" }}>
-                <div style={{ fontSize: "2.5rem", marginBottom: "8px" }}>🎉</div>
-                <h3 style={{ color: "#34d399", margin: "0 0 8px 0" }}>
-                  Remediation Complete!
-                </h3>
-                <p
-                  style={{
-                    color: "#94a3b8",
-                    maxWidth: "500px",
-                    margin: "0 auto 18px auto",
-                    fontSize: "0.9rem",
-                  }}
-                >
+              <div className="remediation-complete-box">
+                <AwardIcon style={{ width: 40, height: 40, color: "var(--success-text)" }} />
+                <h3>Remediation Completed</h3>
+                <p>
                   Great work! You have completed all targeted remediation items for this topic.
                   Your updated mastery score has been recorded into SQLite storage.
                 </p>
                 <button
                   type="button"
-                  className="btn primary"
+                  className="btn btn-primary"
                   onClick={handleCloseRemediation}
                 >
-                  Done · Return to Practice
+                  Return to Practice
                 </button>
               </div>
             ) : (
@@ -606,110 +548,60 @@ export function QuizPane({
                     marginBottom: "12px",
                   }}
                 >
-                  <span style={{ fontSize: "0.82rem", color: "#94a3b8", fontWeight: 600 }}>
+                  <span style={{ fontSize: "0.82rem", color: "var(--text-muted)", fontWeight: 600 }}>
                     Practice Item {remediationIndex + 1} of {remediationPack.items.length}
                   </span>
                   <div style={{ display: "flex", gap: "8px" }}>
-                    <span
-                      className="chip"
-                      style={{ textTransform: "uppercase", fontSize: "0.72rem" }}
-                    >
+                    <span className="badge" style={{ textTransform: "uppercase" }}>
                       {remediationPack.items[remediationIndex]?.kind.replace("_", " ")}
                     </span>
-                    <span
-                      className="chip chip-accent"
-                      style={{ fontSize: "0.72rem" }}
-                    >
+                    <span className="badge badge-accent">
                       Difficulty {remediationPack.items[remediationIndex]?.difficulty}
                     </span>
                   </div>
                 </div>
 
                 {/* Prompt */}
-                <p
+                <h4
                   style={{
                     fontSize: "1.05rem",
                     fontWeight: 600,
-                    color: "#f8fafc",
+                    color: "var(--text-primary)",
                     margin: "0 0 16px 0",
                     lineHeight: 1.5,
                   }}
                 >
                   {remediationPack.items[remediationIndex]?.prompt}
-                </p>
+                </h4>
 
                 {/* Answer Options */}
                 {remediationPack.items[remediationIndex]?.kind === "mcq" ? (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "8px",
-                      marginBottom: "18px",
-                    }}
-                  >
+                  <div className="quiz-options-list">
                     {remediationPack.items[remediationIndex]?.options.map((opt, idx) => (
                       <button
                         key={opt}
                         type="button"
+                        className={`quiz-option-btn ${remediationSelected === idx ? "selected" : ""}`}
                         disabled={remediationResult !== null || remediationSubmitting}
                         onClick={() => setRemediationSelected(idx)}
-                        style={{
-                          textAlign: "left",
-                          padding: "10px 14px",
-                          borderRadius: "8px",
-                          border:
-                            remediationSelected === idx
-                              ? "1px solid #3b82f6"
-                              : "1px solid rgba(255,255,255,0.1)",
-                          background:
-                            remediationSelected === idx
-                              ? "rgba(37, 99, 235, 0.3)"
-                              : "rgba(15, 23, 42, 0.6)",
-                          color: "#f1f5f9",
-                          cursor: remediationResult !== null ? "default" : "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                          fontSize: "0.9rem",
-                        }}
                       >
-                        <span
-                          style={{
-                            fontWeight: 700,
-                            color: remediationSelected === idx ? "#60a5fa" : "#94a3b8",
-                          }}
-                        >
-                          {LETTERS[idx] ?? idx + 1}.
+                        <span className="quiz-option-letter">
+                          {LETTERS[idx] ?? idx + 1}
                         </span>
-                        <span>{opt}</span>
+                        <span style={{ flex: 1 }}>{opt}</span>
                       </button>
                     ))}
                   </div>
                 ) : remediationPack.items[remediationIndex]?.kind === "true_false" ? (
-                  <div style={{ display: "flex", gap: "12px", marginBottom: "18px" }}>
+                  <div className="segmented" style={{ marginBottom: "18px" }}>
                     {["True", "False"].map((tf) => (
                       <button
                         key={tf}
                         type="button"
                         disabled={remediationResult !== null || remediationSubmitting}
                         onClick={() => setRemediationAnswer(tf)}
-                        style={{
-                          flex: 1,
-                          padding: "12px",
-                          borderRadius: "8px",
-                          fontWeight: 700,
-                          border:
-                            remediationAnswer.toLowerCase() === tf.toLowerCase()
-                              ? "1px solid #3b82f6"
-                              : "1px solid rgba(255,255,255,0.1)",
-                          background:
-                            remediationAnswer.toLowerCase() === tf.toLowerCase()
-                              ? "rgba(37, 99, 235, 0.3)"
-                              : "rgba(15, 23, 42, 0.6)",
-                          color: "#f1f5f9",
-                          cursor: remediationResult !== null ? "default" : "pointer",
-                        }}
+                        className={`segmented-btn ${remediationAnswer.toLowerCase() === tf.toLowerCase() ? "active" : ""}`}
+                        style={{ padding: "10px 16px" }}
                       >
                         {tf}
                       </button>
@@ -719,12 +611,11 @@ export function QuizPane({
                   <div style={{ marginBottom: "18px" }}>
                     <input
                       type="text"
-                      className="text-input"
+                      className="input"
                       placeholder="Type your answer here…"
                       value={remediationAnswer}
                       onChange={(e) => setRemediationAnswer(e.target.value)}
                       disabled={remediationResult !== null || remediationSubmitting}
-                      style={{ width: "100%", padding: "10px 14px", fontSize: "0.95rem" }}
                     />
                   </div>
                 )}
@@ -768,14 +659,14 @@ export function QuizPane({
                       </div>
                     )}
 
-                    {/* 💡 Built-in Concept Explanation Card */}
+                    {/* Built-in Concept Explanation Card */}
                     <div className="concept-explanation-card">
                       <div className="concept-explanation-header">
-                        <div className="concept-header-left">
-                          <span className="concept-bulb-icon">💡</span>
-                          <span className="concept-card-title">Built-in Concept Explanation</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <BookIcon />
+                          <span className="concept-card-title">Concept Explanation</span>
                         </div>
-                        <span className="ncert-badge">📘 NCERT Syllabus Grounded</span>
+                        <span className="badge">NCERT Grounded</span>
                       </div>
 
                       {/* Meaning & Intent Analysis */}
@@ -811,21 +702,29 @@ export function QuizPane({
                 ) : null}
 
                 {/* Action Buttons */}
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "16px" }}>
                   {remediationResult ? (
                     <button
                       type="button"
-                      className="btn primary"
+                      className="btn btn-primary"
                       onClick={handleNextRemediation}
                     >
-                      {remediationIndex + 1 < remediationPack.items.length
-                        ? "Next Item ➔"
-                        : "Complete Drill 🎉"}
+                      {remediationIndex + 1 < remediationPack.items.length ? (
+                        <>
+                          <span>Next Item</span>
+                          <ArrowRightIcon />
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircleIcon />
+                          <span>Complete Drill</span>
+                        </>
+                      )}
                     </button>
                   ) : (
                     <button
                       type="button"
-                      className="btn primary"
+                      className="btn btn-primary"
                       onClick={() => void handleSubmitRemediation()}
                       disabled={
                         remediationSubmitting ||
@@ -834,7 +733,8 @@ export function QuizPane({
                           : remediationAnswer.trim().length === 0)
                       }
                     >
-                      {remediationSubmitting ? "Checking…" : "Check Answer"}
+                      {remediationSubmitting ? <span className="spinner small" /> : <CheckIcon />}
+                      <span>{remediationSubmitting ? "Checking…" : "Check Answer"}</span>
                     </button>
                   )}
                 </div>
@@ -982,7 +882,7 @@ export function QuizPane({
                   <h3 className="quiz-prompt">{question.prompt}</h3>
 
                   {question.kind === "mcq" ? (
-                    <div className="quiz-options">
+                    <div className="quiz-options-list">
                       {question.options.map((option, index) => {
                         const isSelected = selected === index;
                         const isCorrect = showResult && expectedOption === option;
@@ -991,16 +891,16 @@ export function QuizPane({
                           <button
                             key={`${question.id}-${index}`}
                             type="button"
-                            className={`quiz-option ${isSelected ? "selected" : ""} ${
+                            className={`quiz-option-btn ${isSelected ? "selected" : ""} ${
                               isCorrect ? "correct" : ""
                             } ${isWrong ? "wrong" : ""}`}
                             onClick={() => setSelected(index)}
                             disabled={showResult || answering}
                           >
-                            <span className="option-letter">{LETTERS[index] ?? index + 1}</span>
-                            <span>{option}</span>
-                            {isCorrect ? <CheckIcon /> : null}
-                            {isWrong ? <WarningIcon /> : null}
+                            <span className="quiz-option-letter">{LETTERS[index] ?? index + 1}</span>
+                            <span style={{ flex: 1 }}>{option}</span>
+                            {isCorrect ? <CheckIcon style={{ color: "var(--success-text)" }} /> : null}
+                            {isWrong ? <WarningIcon style={{ color: "var(--danger-text)" }} /> : null}
                           </button>
                         );
                       })}
@@ -1064,14 +964,14 @@ export function QuizPane({
                         </div>
                       )}
 
-                      {/* 💡 Built-in Concept Explanation Card */}
+                      {/* Built-in Concept Explanation Card */}
                       <div className="concept-explanation-card">
                         <div className="concept-explanation-header">
-                          <div className="concept-header-left">
-                            <span className="concept-bulb-icon">💡</span>
-                            <span className="concept-card-title">Built-in Concept Explanation</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <BookIcon />
+                            <span className="concept-card-title">Concept Explanation</span>
                           </div>
-                          <span className="ncert-badge">📘 NCERT Syllabus Grounded</span>
+                          <span className="badge">NCERT Grounded</span>
                         </div>
 
                         {/* Meaning & Intent Analysis */}
@@ -1106,22 +1006,23 @@ export function QuizPane({
                     </div>
                   ) : null}
 
-                  <div className="quiz-actions">
+                  <div className="quiz-actions" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 20 }}>
                     {showResult ? (
                       feedback?.completed ? (
-                        <button type="button" className="btn primary" onClick={endQuiz}>
-                          <SparkIcon />
-                          New quiz
+                        <button type="button" className="btn btn-primary" onClick={endQuiz}>
+                          <CheckCircleIcon />
+                          <span>New Quiz</span>
                         </button>
                       ) : (
-                        <button type="button" className="btn primary" onClick={next}>
-                          Next question
+                        <button type="button" className="btn btn-primary" onClick={next}>
+                          <span>Next Question</span>
+                          <ArrowRightIcon />
                         </button>
                       )
                     ) : (
                       <button
                         type="button"
-                        className="btn primary"
+                        className="btn btn-primary"
                         onClick={() => void submit()}
                         disabled={
                           answering ||
@@ -1131,7 +1032,7 @@ export function QuizPane({
                         }
                       >
                         {answering ? <span className="spinner small" /> : <CheckIcon />}
-                        {answering ? "Checking…" : "Check answer"}
+                        <span>{answering ? "Checking…" : "Check Answer"}</span>
                       </button>
                     )}
                     <span className="quiz-source-note">
@@ -1146,7 +1047,7 @@ export function QuizPane({
                 <div className="quiz-summary">
                   <div className="quiz-summary-head">
                     <div>
-                      <p className="panel-kicker">Session complete</p>
+                      <p className="panel-kicker">Session Complete</p>
                       <h3>
                         {active.progress.correct}/{active.progress.total} correct ·{" "}
                         {Math.round(active.progress.score * 100)}%
@@ -1161,13 +1062,13 @@ export function QuizPane({
                     {mastery.length === 1 ? "" : "s"}. The next quiz starts at{" "}
                     {DIFFICULTY_LABELS[active.targetDifficulty] ?? "Core"} difficulty.
                   </p>
-                  <div className="quiz-summary-actions">
-                    <button type="button" className="btn primary" onClick={() => void start()}>
+                  <div className="quiz-summary-actions" style={{ display: "flex", gap: 10, marginTop: 16 }}>
+                    <button type="button" className="btn btn-primary" onClick={() => void start()}>
                       <PlayIcon />
-                      Practise again
+                      <span>Practise Again</span>
                     </button>
-                    <button type="button" className="btn ghost" onClick={endQuiz}>
-                      Change settings
+                    <button type="button" className="btn btn-secondary" onClick={endQuiz}>
+                      Change Settings
                     </button>
                   </div>
                 </div>
@@ -1177,8 +1078,8 @@ export function QuizPane({
             <aside className="quiz-side">
               <div className="quiz-side-card">
                 <div className="quiz-side-head">
-                  <span>Mastery</span>
-                  <span className="chip">{trimmedStudent}</span>
+                  <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>Mastery by Topic</span>
+                  <span className="badge">{trimmedStudent}</span>
                 </div>
                 {mastery.length ? (
                   <div className="mastery-list">
@@ -1207,11 +1108,13 @@ export function QuizPane({
 
               <div className="nlm-side-card">
                 <div className="nlm-side-head">
-                  <div className="nlm-head-title-wrap">
-                    <span className="nlm-head-icon">📊</span>
-                    <span className="nlm-head-title">Weakest Topics &amp; ML Gaps</span>
+                  <div className="nlm-head-title-wrap" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <BarChartIcon />
+                    <span className="nlm-head-title" style={{ fontWeight: 600, color: "var(--text-primary)" }}>
+                      Weakest Topics &amp; ML Gaps
+                    </span>
                   </div>
-                  <span className="nlm-pill-badge">{gaps?.attempts ?? 0} attempts</span>
+                  <span className="badge">{gaps?.attempts ?? 0} attempts</span>
                 </div>
                 {weakest.length ? (
                   <div className="nlm-gap-list">
