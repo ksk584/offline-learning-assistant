@@ -107,6 +107,7 @@ export interface AskOptions {
   lines?: DemoLine[];
   classLevel: number;
   subject: string;
+  chapter?: number | null;
   topK?: number;
   useLlm?: boolean;
 }
@@ -120,6 +121,7 @@ export function askQuestion(options: AskOptions): Promise<AskResponse> {
       lines: options.lines ?? [],
       class_level: options.classLevel,
       subject: options.subject,
+      chapter: options.chapter ?? null,
       top_k: options.topK ?? 5,
       use_llm: options.useLlm ?? true,
     }),

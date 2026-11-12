@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { askQuestion } from "../api";
 import { messageOf } from "../format";
 import type { AskResponse, DemoLine } from "../types";
@@ -105,6 +107,7 @@ export function AskPane({
           question: query,
           classLevel,
           subject,
+          chapter: isMath ? selectedChapter : null,
           lines,
           useLlm: true,
         });
@@ -115,7 +118,7 @@ export function AskPane({
         setLoading(false);
       }
     },
-    [classLevel, lines, question, subject],
+    [classLevel, isMath, lines, question, selectedChapter, subject],
   );
 
   return (
@@ -228,8 +231,14 @@ export function AskPane({
           </header>
 
           {/* Formatted Answer Body */}
-          <div className="markdown" style={{ fontSize: "0.96rem", lineHeight: 1.7 }}>
-            {response.answer}
+          <div
+            id="qa-answer-container"
+            className="markdown"
+            style={{ fontSize: "0.96rem", lineHeight: 1.7 }}
+          >
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {response.answer}
+            </ReactMarkdown>
           </div>
 
           {/* Verified Citations & Text Excerpts */}

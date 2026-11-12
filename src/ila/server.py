@@ -204,6 +204,7 @@ class AskRequest(BaseModel):
     session_id: str | None = None
     class_level: int | None = None
     subject: str | None = None
+    chapter: int | None = None
     top_k: int = Field(default=5, ge=1, le=10)
     min_score: float | None = Field(default=None, gt=0, le=2)
     use_llm: bool = True
@@ -406,6 +407,10 @@ def _lines_from_payload(
     return [], "demo", {}
 
 
+_STATIC_KB_CACHE: dict[tuple[int, str, str], tuple[KnowledgeBase, dict[str, Any]]] = {}
+_QA_CACHE: dict[tuple[str, int, str, int | None, bool], dict[str, Any]] = {}
+
+
 def _knowledge_base(
     *,
     lines: list[NoteLine],
@@ -442,6 +447,10 @@ def _knowledge_base(
                 "exact": exact,
                 "text": " ".join(line.text for line in resolved),
             }
+        cache_key = (class_level, subject, source_kind)
+        if cache_key in _STATIC_KB_CACHE:
+            cached_kb, cached_meta = _STATIC_KB_CACHE[cache_key]
+            return cached_kb, dict(cached_meta)
     else:
         meta["title"] = title or meta.get("title") or "Lecture"
     knowledge = KnowledgeBase.from_lines(
@@ -455,6 +464,8 @@ def _knowledge_base(
     )
     meta["lines"] = len(resolved)
     meta["course"] = knowledge.course.label if knowledge.course else None
+    if not resolved:
+        _STATIC_KB_CACHE[(class_level, subject, source_kind)] = (knowledge, dict(meta))
     return knowledge, meta
 
 
@@ -920,6 +931,18 @@ async def transcribe_upload(
 async def ask_question(request: AskRequest) -> dict[str, Any]:
     """Answer from the current transcript, a saved session, or the built-in demo."""
     level, name = _selection(request.class_level, request.subject)
+    cache_key = None
+    if not request.lines and not request.text and not request.session_id:
+        cache_key = (
+            request.question.strip().lower(),
+            level,
+            name,
+            request.chapter,
+            bool(request.use_llm),
+        )
+        if cache_key in _QA_CACHE:
+            return dict(_QA_CACHE[cache_key])
+
     knowledge, meta = _knowledge_base(
         lines=request.lines,
         text=request.text,
@@ -938,6 +961,7 @@ async def ask_question(request: AskRequest) -> dict[str, Any]:
         engine.ask,
         request.question,
         use_llm=request.use_llm and llm is not None,
+        chapter=request.chapter,
     )
     payload = answer.to_dict()
     payload["source"] = meta
@@ -945,6 +969,10 @@ async def ask_question(request: AskRequest) -> dict[str, Any]:
     payload["chapter_matches"] = [
         match.to_dict() for match in knowledge.chapter_matches
     ]
+    if cache_key is not None and payload.get("answerable") and payload.get("answer"):
+        if len(_QA_CACHE) > 100:
+            _QA_CACHE.clear()
+        _QA_CACHE[cache_key] = payload
     return payload
 
 

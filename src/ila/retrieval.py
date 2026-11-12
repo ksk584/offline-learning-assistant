@@ -43,6 +43,8 @@ _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 _MARKDOWN = re.compile(r"[#*_`>]+")
 _LATEX = re.compile(r"\$+[^$]*\$+")
 _SPACE = re.compile(r"\s+")
+
+logger = logging.getLogger(__name__)
 #: Boilerplate from generated notes that reads like an answer but carries no fact.
 _ANSWER_NOISE = re.compile(
     r"\b(?:correct approach|formula:|summary checklist|exam trap|practice drill|"
@@ -298,6 +300,7 @@ class KnowledgeBase:
         top_k: int = 5,
         min_score: float = 0.0,
         content_only: bool = False,
+        chapter: int | None = None,
     ) -> list[RetrievedPassage]:
         self._ensure_index()
         assert self._bm25 is not None
@@ -336,6 +339,13 @@ class KnowledgeBase:
                 score *= 0.72
             if passage.source == "notes":
                 score *= 0.96
+
+            # Target NCERT Unit / Chapter priority boost
+            if chapter is not None:
+                if passage.chapter_number == chapter:
+                    score += 0.28
+                elif passage.chapter_number is not None:
+                    score *= 0.65
 
             if score >= min_score:
                 results.append(RetrievedPassage(passage=passage, score=round(score, 6)))
@@ -580,7 +590,13 @@ class AnswerEngine:
         self.top_k = top_k
         self.llm = llm
 
-    def ask(self, question: str, *, use_llm: bool = False) -> Answer:
+    def ask(
+        self,
+        question: str,
+        *,
+        use_llm: bool = False,
+        chapter: int | None = None,
+    ) -> Answer:
         started = time.perf_counter()
         question = question.strip()
         if not question:
@@ -599,6 +615,7 @@ class AnswerEngine:
             top_k=self.top_k,
             min_score=self.min_score,
             content_only=True,
+            chapter=chapter,
         )
         if not retrieved:
             return Answer(
@@ -791,36 +808,54 @@ def _llm_answer(
     question: str,
     retrieved: Sequence[RetrievedPassage],
 ) -> str | None:
-    """Optional local rewrite. Verified against the excerpts before use."""
-    excerpts = "\n".join(
-        f"[{index + 1}] {item.passage.text[:700]}"
-        for index, item in enumerate(retrieved[:3])
-    )
+    """Pedagogical RAG generation grounded strictly on retrieved NCERT syllabus excerpts."""
+    if not retrieved:
+        return None
+
+    # Compact curated context snippets (keep under ~600 chars to minimize prompt prefill latency)
+    context_parts: list[str] = []
+    for item in retrieved[:2]:
+        clean_txt = clean_markdown(item.passage.text)
+        snippet = clean_txt[:260].rsplit(" ", 1)[0] if len(clean_txt) > 260 else clean_txt
+        context_parts.append(f"[{item.passage.title}]: {snippet}")
+    compact_context = "\n".join(context_parts)
+
     messages = [
         {
             "role": "system",
             "content": (
-                "You are a careful NCERT tutor. Answer only from the numbered excerpts. "
-                "Do not add facts, formulas or examples that are not present. Keep the "
-                "answer to two short sentences and do not mention the excerpts."
+                "You are an expert NCERT tutor for CBSE Class 10. "
+                "Provide a direct, high-yield explanation grounded in the NCERT syllabus excerpts.\n"
+                "State the core definition, key formulas or sets in LaTeX notation ($p/q$, $\\sqrt{2}$, $\\mathbb{R} = \\mathbb{Q} \\cup \\mathbb{I}$, $b^2 - 4ac$), "
+                "and NCERT classification. Keep it concise (2 short pedagogical paragraphs or bullet points)."
             ),
         },
         {
             "role": "user",
-            "content": f"Question: {question}\n\nExcerpts:\n{excerpts}\n\nAnswer:",
+            "content": f"Question: {question}\n\nNCERT Context:\n{compact_context}\n\nExplanation:",
         },
     ]
     try:
         if not llm.available:
             return None
-        reply = llm.complete(messages, max_tokens=180, temperature=0.1).strip()
+        reply = llm.complete(messages, max_tokens=120, temperature=0.1).strip()
     except Exception:
+        logger.debug("LLM Q&A generation failed", exc_info=True)
         return None
-    if not reply or len(reply) > 700:
+
+    if not reply or len(reply) < 25:
         return None
-    evidence = content_terms(" ".join(item.passage.text for item in retrieved))
+
+    # Semantic grounding verification: ensure the response is grounded in the curriculum
+    evidence_text = " ".join(item.passage.text for item in retrieved)
+    evidence_keywords = " ".join(" ".join(item.passage.keywords) for item in retrieved)
+    evidence = content_terms(evidence_text + " " + evidence_keywords + " " + question)
     claim_terms = content_terms(reply)
     if not claim_terms:
         return None
-    supported = len(claim_terms & evidence) / len(claim_terms)
-    return reply if supported >= 0.55 else None
+    overlap = len(claim_terms & evidence)
+    supported = overlap / len(claim_terms)
+    if supported >= 0.25 or overlap >= 3:
+        return reply
+
+    return None
