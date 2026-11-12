@@ -207,7 +207,11 @@ def _definition_records(
                 continue
             if any(phrase in term.lower() for phrase in _BAD_TERM_PHRASES):
                 continue
-            if _NUMBER_START.match(body) or body.lower().startswith("so "):
+            if (
+                _NUMBER_START.match(term)
+                or _NUMBER_START.match(body)
+                or body.lower().startswith("so ")
+            ):
                 continue
             if body.lower().startswith(("called ", "known as ")):
                 continue
@@ -462,8 +466,8 @@ def build_question_bank(
 ) -> list[QuizQuestion]:
     """Build a mixed, deterministic question pool from grounded passages.
 
-    Lecture questions come first. NCERT textbook passages and master notes
-    provide full curriculum coverage across all chapters.
+    Lecture questions come first. NCERT textbook exercises and examples
+    provide full curriculum coverage across all chapters for Mathematics.
     """
     bank: list[QuizQuestion] = []
     lecture_definitions = _definition_records(knowledge, sources={"lecture"})
@@ -471,11 +475,17 @@ def build_question_bank(
     bank.extend(_short_answer_questions(lecture_definitions, limit=30))
     bank.extend(_cloze_questions(knowledge, sources={"lecture"}, max_questions=100))
 
-    # Master notes and extracted NCERT textbook passages
-    tb_definitions = _definition_records(knowledge, sources={"textbook", "notes"})
-    bank.extend(_definition_questions(tb_definitions))
-    bank.extend(_short_answer_questions(tb_definitions, limit=40))
-    bank.extend(_cloze_questions(knowledge, sources={"textbook", "notes"}, max_questions=120))
+    is_math = knowledge.course is not None and knowledge.course.subject == "maths"
+    if is_math:
+        from ila.ncert_math_questions import get_ncert_math_questions
+
+        bank.extend(get_ncert_math_questions())
+    else:
+        # Master notes and extracted NCERT textbook passages for non-math subjects
+        tb_definitions = _definition_records(knowledge, sources={"textbook", "notes"})
+        bank.extend(_definition_questions(tb_definitions))
+        bank.extend(_short_answer_questions(tb_definitions, limit=40))
+        bank.extend(_cloze_questions(knowledge, sources={"textbook", "notes"}, max_questions=120))
 
     # De-duplicate by id while preserving the definition-first order.
     unique: dict[str, QuizQuestion] = {}
