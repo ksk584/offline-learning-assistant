@@ -10,7 +10,7 @@ Set-Location -Path $PSScriptRoot
 Write-Host "===============================================================================" -ForegroundColor Cyan
 Write-Host "  OFFLINE INTELLIGENT LEARNING ASSISTANT (ILA)" -ForegroundColor Cyan
 Write-Host "  On-Device NCERT Class 10 Master Notes & Live Lecture Transcription" -ForegroundColor Cyan
-Write-Host "  SDG 4 · Fully Offline Architecture · Zero Cloud Dependency" -ForegroundColor Cyan
+Write-Host "  SDG 4 - Fully Offline Architecture - Zero Cloud Dependency" -ForegroundColor Cyan
 Write-Host "===============================================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -44,7 +44,7 @@ if (-not $PythonCmd) {
 }
 
 $PyVer = & $PythonCmd --version 2>&1
-Write-Host "[✓] Found $PyVer ($PythonCmd)" -ForegroundColor Green
+Write-Host "[+] Found $PyVer ($PythonCmd)" -ForegroundColor Green
 
 # 2. Check / Install uv
 Write-Host "[*] Checking package manager (uv)..." -ForegroundColor Yellow
@@ -66,7 +66,7 @@ if (Get-Command uv -ErrorAction SilentlyContinue) {
 }
 
 if ($UvCmd) {
-    Write-Host "[✓] Package manager ($UvCmd) ready." -ForegroundColor Green
+    Write-Host "[+] Package manager ($UvCmd) ready." -ForegroundColor Green
 }
 
 # 3. Setup Dependencies
@@ -90,7 +90,7 @@ if ($UvCmd) {
         & ".venv\Scripts\python.exe" -m pip install -e .
     }
 }
-Write-Host "[✓] Dependencies installed." -ForegroundColor Green
+Write-Host "[+] Dependencies installed." -ForegroundColor Green
 
 # 4. Check Local LLM Models
 Write-Host "[*] Checking on-device LLM model..." -ForegroundColor Yellow
@@ -99,7 +99,7 @@ $UserModels = @(Get-ChildItem -Path "$env:USERPROFILE\.ila\models\llm\*.gguf" -E
 $ModelExists = ($LocalModels.Count -gt 0) -or ($UserModels.Count -gt 0)
 
 if ($ModelExists) {
-    Write-Host "[✓] Offline LLM model found." -ForegroundColor Green
+    Write-Host "[+] Offline LLM model found." -ForegroundColor Green
 } else {
     Write-Host "[!] No offline LLM model detected." -ForegroundColor Yellow
     Write-Host "[*] Downloading local Qwen 3.5 model (~532 MB) from Hugging Face..." -ForegroundColor Yellow
@@ -108,13 +108,13 @@ if ($ModelExists) {
     } else {
         & ".venv\Scripts\python.exe" -m ila.cli download-llm --profile potato
     }
-    Write-Host "[✓] Model ready." -ForegroundColor Green
+    Write-Host "[+] Model ready." -ForegroundColor Green
 }
 
 # 5. Check Dashboard
 Write-Host "[*] Verifying Web Dashboard..." -ForegroundColor Yellow
 if (Test-Path "dashboard\dist\index.html") {
-    Write-Host "[✓] Dashboard is compiled and ready." -ForegroundColor Green
+    Write-Host "[+] Dashboard is compiled and ready." -ForegroundColor Green
 } else {
     if (Get-Command npm -ErrorAction SilentlyContinue) {
         Write-Host "[*] Building React dashboard..." -ForegroundColor Yellow
@@ -164,3 +164,8 @@ if ($UvCmd) {
     & ".venv\Scripts\ila.exe" serve --host 127.0.0.1 --port 8765 --open
 }
 
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ""
+    Write-Host "[!] ILA server stopped with error code $LASTEXITCODE." -ForegroundColor Red
+    Read-Host "Press Enter to close this window"
+}

@@ -7,10 +7,14 @@ title Offline Intelligent Learning Assistant (ILA) - Setup and Runner
 :: Prefer PowerShell Engine (Immune to CMD encoding and line-ending quirks)
 :: -------------------------------------------------------------------------
 where powershell >nul 2>&1
-if %ERRORLEVEL% equ 0 (
+if not errorlevel 1 (
     powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0install-run.ps1"
-    if %ERRORLEVEL% neq 0 pause
-    exit /b %ERRORLEVEL%
+    if errorlevel 1 (
+        echo.
+        echo [!] ILA startup encountered an error.
+        pause
+    )
+    exit /b
 )
 
 :: -------------------------------------------------------------------------
@@ -73,7 +77,7 @@ exit /b 1
 
 :python_found
 for /f "tokens=*" %%v in ('!PYTHON_CMD! --version 2^>^&1') do set "PY_VER=%%v"
-echo [✓] Found !PY_VER! (!PYTHON_CMD!)
+echo [+] Found !PY_VER! (!PYTHON_CMD!)
 
 :: 2. Check / Install uv
 echo [*] Checking package manager (uv)...
@@ -126,7 +130,7 @@ echo [!] Could not auto-install uv; falling back to standard pip.
 
 :uv_found
 if defined UV_CMD (
-    echo [✓] Package manager ready.
+    echo [+] Package manager ready.
 )
 
 :: 3. Setup Virtual Environment and Install Dependencies
@@ -155,7 +159,7 @@ if defined UV_CMD (
     )
 )
 
-echo [✓] Core dependencies and virtual environment ready.
+echo [+] Core dependencies and virtual environment ready.
 
 :: 4. Verify / Auto-Download Local LLM Note-Writing Model
 echo [*] Checking on-device LLM model...
@@ -175,14 +179,14 @@ if defined UV_CMD (
     .venv\Scripts\python -m ila.cli download-llm --profile potato
 )
 if !errorlevel! equ 0 (
-    echo [✓] Model downloaded and verified successfully!
+    echo [+] Model downloaded and verified successfully!
 ) else (
     echo [!] Note: LLM download can be resumed anytime via: ila download-llm
 )
 goto :model_done
 
 :model_ready
-echo [✓] Offline LLM model found and verified.
+echo [+] Offline LLM model found and verified.
 
 :model_done
 
@@ -198,7 +202,7 @@ if not exist "dashboard\dist\index.html" (
         echo [!] Warning: Node.js/npm not found to build dashboard.
     )
 ) else (
-    echo [✓] Dashboard is compiled and ready to serve.
+    echo [+] Dashboard is compiled and ready to serve.
 )
 
 :: 6. Launch Application Server and Open Browser
