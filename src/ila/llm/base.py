@@ -39,7 +39,7 @@ class LlmProvider(Protocol):
         self,
         messages: Sequence[Message],
         *,
-        max_tokens: int = 320,
+        max_tokens: int = 650,
         temperature: float = 0.2,
         stop: Sequence[str] | None = None,
     ) -> str:

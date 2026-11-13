@@ -140,7 +140,7 @@ def test_llm_answer_solves_new_question_with_textbook_techniques() -> None:
     class MockLLM:
         available: bool = True
 
-        def complete(self, messages: list[dict[str, str]], max_tokens: int = 320, temperature: float = 0.1) -> str:
+        def complete(self, messages: list[dict[str, str]], **kwargs: Any) -> str:
             return (
                 "**Core Concept & Formula**:\n"
                 "According to NCERT Chapter 4, a quadratic equation ax^2 + bx + c = 0 is solved using the "

@@ -41,7 +41,7 @@ class NullLlmProvider:
     def available(self) -> bool:
         return False
 
-    def complete(self, messages, *, max_tokens=320, temperature=0.2, stop=None) -> str:  # noqa: ARG002
+    def complete(self, messages, *, max_tokens=650, temperature=0.2, stop=None) -> str:  # noqa: ARG002
         raise RuntimeError(self.reason)
 
 

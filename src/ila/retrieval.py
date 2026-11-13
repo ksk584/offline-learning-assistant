@@ -845,28 +845,25 @@ def _llm_answer(
 
     system_prompt = (
         "You are an expert CBSE/NCERT Class 10 academic tutor.\n"
-        "Your goal is to provide a detailed, clear, and comprehensive explanation grounded in the NCERT syllabus.\n\n"
+        "Your goal is to provide a complete, detailed, and syllabus-grounded explanation or step-by-step solution.\n\n"
         "CORE INSTRUCTIONS:\n"
-        "1. Detailed Explanations: Thoroughly explain the underlying concepts, definitions, scientific principles, "
-        "or mathematical properties. Provide depth, clarity, and intuition. Avoid brief or superficial one-liners.\n"
+        "1. Complete Explanations: Thoroughly explain the underlying concepts, definitions, scientific principles, "
+        "or mathematical properties. Always finish every explanation and step completely. Do NOT stop halfway.\n"
         "2. Answering New & Numerical Questions: When asked a new question, unseen problem, equation, or numerical exercise:\n"
-        "   - Identify the textbook technique, theorem, law, or formula (e.g., quadratic formula, mirror formula, Ohm's law, probability, factorisation).\n"
-        "   - State the formula explicitly in LaTeX ($...$ or $$...$$).\n"
-        "   - Provide a step-by-step solution, showing the substitution of given values and clear intermediate reasoning.\n"
-        "   - State the final calculated answer or conclusion with appropriate units.\n"
-        "3. Strict Syllabus Grounding: Only use techniques, sign conventions, and methodologies from the NCERT curriculum. "
-        "Do not invent non-syllabus shortcuts.\n"
-        "4. Structured Formatting: Format your answer cleanly using markdown sections or bold headings, such as:\n"
-        "   - **Core Concept / Principle**: Foundational definition or rule.\n"
-        "   - **Formulas & Techniques**: Standard mathematical or scientific relations.\n"
-        "   - **Step-by-Step Explanation / Solution**: Detailed reasoning or derivation.\n"
-        "   - **Key Takeaway**: Summary or exam tip."
+        "   - State the relevant NCERT formula explicitly in LaTeX notation ($...$ or $$...$$).\n"
+        "   - Provide clear, numbered steps with substitutions and intermediate calculations.\n"
+        "   - Always conclude with the final calculated answer or deduction with appropriate units.\n"
+        "3. Strict Syllabus Grounding: Only use techniques, sign conventions, and methodologies from the NCERT curriculum.\n"
+        "4. Structured Format:\n"
+        "   - **Core Concept & Formula**: Essential principle and LaTeX formula.\n"
+        "   - **Step-by-Step Solution / Explanation**: Numbered steps with clear calculations.\n"
+        "   - **Final Answer**: Concluding result and takeaway."
     )
 
     user_prompt = (
         f"Student Question: {question}\n\n"
         f"Official NCERT Syllabus Context & Excerpts:\n{context_block}\n\n"
-        "Please provide a detailed, grounded pedagogical explanation / step-by-step solution:"
+        "Please provide a complete, detailed, grounded pedagogical explanation / step-by-step solution:"
     )
 
     messages = [
@@ -877,14 +874,20 @@ def _llm_answer(
     try:
         if not getattr(llm, "available", False):
             return None
-        # Allow sufficient token budget (up to 320 tokens) for full step-by-step solutions
-        reply = llm.complete(messages, max_tokens=320, temperature=0.15).strip()
+        # Allow ample token budget (up to 650 tokens) for complete step-by-step solutions
+        reply = llm.complete(messages, max_tokens=650, temperature=0.15).strip()
     except Exception:
         logger.debug("LLM Q&A generation failed", exc_info=True)
         return None
 
     if not reply or len(reply) < 30:
         return None
+
+    # Clean any trailing cut-off fragment if generation abruptly ended
+    if reply and not reply.endswith((".", "!", "?", "}", "$", "*", "\n", "```")):
+        last_period = max(reply.rfind("."), reply.rfind("\n"), reply.rfind("$"))
+        if last_period > len(reply) * 0.7:
+            reply = reply[: last_period + 1].strip()
 
     # Semantic grounding verification: ensure the response is grounded in the curriculum
     evidence_text = " ".join(item.passage.text for item in retrieved)
