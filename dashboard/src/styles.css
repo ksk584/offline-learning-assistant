@@ -1969,6 +1969,17 @@ pre {
   background: rgba(255, 255, 255, 0.02);
 }
 
+.analytics-subject-group-row td {
+  background: rgba(255, 255, 255, 0.045) !important;
+  border-top: 1px solid var(--border-default);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 10px 18px;
+}
+
+.analytics-subject-group-row:hover td {
+  background: rgba(255, 255, 255, 0.065) !important;
+}
+
 .teacher-grid-bottom {
   display: grid;
   grid-template-columns: 1fr 1fr;

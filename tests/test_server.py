@@ -351,6 +351,9 @@ def test_teacher_endpoints_and_overview(store: Storage) -> None:
     assert "total_sessions" in ov
     assert "total_attempts" in ov
     assert "topics" in ov
+    assert len(ov["topics"]) >= 1
+    assert "subject" in ov["topics"][0]
+    assert "subject_label" in ov["topics"][0]
 
     st_res = client.get("/api/teacher/students")
     assert st_res.status_code == 200

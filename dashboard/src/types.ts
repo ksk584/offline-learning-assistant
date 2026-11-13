@@ -410,6 +410,8 @@ export interface TeacherTopic {
   correct: number;
   accuracy: number;
   avg_response_ms: number;
+  subject?: string;
+  subject_label?: string;
 }
 
 export interface TeacherRecentSession {

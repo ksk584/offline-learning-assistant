@@ -106,6 +106,37 @@ def _loads(value: str | None) -> Any:
         return None
 
 
+def _resolve_topic_subject(topic: str) -> tuple[str, str]:
+    from ila.curriculum import COURSES, SUBJECT_LABELS
+
+    cleaned = topic.strip().lower()
+    for course in COURSES.values():
+        for ch in course.chapters:
+            title_clean = ch.title.strip().lower()
+            if title_clean == cleaned or title_clean in cleaned or cleaned in title_clean:
+                subj = course.subject
+                return subj, SUBJECT_LABELS.get(subj, subj.capitalize())
+
+    math_keywords = (
+        "math", "equation", "number", "polynomial", "trigonometry", "algebra",
+        "probability", "statistics", "geometry", "triangle", "circle", "arithmetic",
+        "fraction", "coordinate", "tangent", "root", "linear",
+    )
+    if any(k in cleaned for k in math_keywords):
+        return "maths", "Mathematics"
+
+    science_keywords = (
+        "science", "light", "current", "acid", "cell", "chemical", "physics",
+        "biology", "chemistry", "eye", "environment", "motion", "force",
+        "gravity", "energy", "sound", "matter", "reflection", "refraction",
+        "heredity", "reproduce", "plant", "animal", "electricity", "magnet",
+    )
+    if any(k in cleaned for k in science_keywords):
+        return "science", "Science"
+
+    return "general", "General"
+
+
 class Storage:
     """Thin, explicit data-access layer (no ORM, no migration framework)."""
 
@@ -539,16 +570,32 @@ class Storage:
                 """
             )
             topic_rows = cursor.fetchall()
+            if not topic_rows:
+                cursor.execute(
+                    """
+                    SELECT topic, SUM(attempts) as attempts_count,
+                           SUM(correct) as correct_count,
+                           0 as avg_ms
+                    FROM mastery
+                    GROUP BY topic
+                    ORDER BY attempts_count DESC
+                    """
+                )
+                topic_rows = cursor.fetchall()
+
             topic_analytics = []
             for t_row in topic_rows:
                 t_name, t_attempts, t_correct, t_avg_ms = t_row
-                t_acc = (t_correct / t_attempts) if t_attempts > 0 else 0.0
+                t_acc = (t_correct / t_attempts) if t_attempts and t_attempts > 0 else 0.0
+                subj, subj_label = _resolve_topic_subject(t_name)
                 topic_analytics.append({
                     "topic": t_name,
-                    "attempts": t_attempts,
-                    "correct": t_correct,
+                    "attempts": t_attempts or 0,
+                    "correct": t_correct or 0,
                     "accuracy": round(t_acc, 4),
                     "avg_response_ms": int(t_avg_ms or 0),
+                    "subject": subj,
+                    "subject_label": subj_label,
                 })
 
             # 5. Recent sessions
