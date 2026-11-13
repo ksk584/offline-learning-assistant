@@ -698,17 +698,35 @@ def serve(
     host: Annotated[str | None, typer.Option(help="Bind address")] = None,
     port: Annotated[int | None, typer.Option(help="Port")] = None,
     reload: Annotated[bool, typer.Option("--reload", help="Auto-reload on code changes")] = False,
+    open_browser: Annotated[bool, typer.Option("--open/--no-open", help="Open browser on start")] = False,
     verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
 ) -> None:
     """Run the local WebSocket API (for the dashboard and integrations)."""
+    import threading
+    import time
+    import webbrowser
     import uvicorn
 
     _configure_logging(verbose)
     settings = load_settings()
+    actual_host = host or settings.server.host
+    actual_port = port or settings.server.port
+
+    if open_browser:
+        def _open() -> None:
+            time.sleep(1.2)
+            url_host = "127.0.0.1" if actual_host in ("0.0.0.0", "127.0.0.1", "localhost") else actual_host
+            try:
+                webbrowser.open(f"http://{url_host}:{actual_port}")
+            except Exception:
+                pass
+
+        threading.Thread(target=_open, daemon=True).start()
+
     uvicorn.run(
         "ila.server:app",
-        host=host or settings.server.host,
-        port=port or settings.server.port,
+        host=actual_host,
+        port=actual_port,
         reload=reload,
         log_level="debug" if verbose else "info",
     )

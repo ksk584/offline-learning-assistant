@@ -137,8 +137,8 @@ Start-Job -ScriptBlock {
 } | Out-Null
 
 if ($UvCmd) {
-    & $UvCmd run ila serve --host 127.0.0.1 --port 8765
+    & $UvCmd run ila serve --host 127.0.0.1 --port 8765 --open
 } else {
-    & ".venv\Scripts\ila.exe" serve --host 127.0.0.1 --port 8765
+    & ".venv\Scripts\ila.exe" serve --host 127.0.0.1 --port 8765 --open
 }
 

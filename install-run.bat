@@ -198,14 +198,14 @@ echo   Press Ctrl+C in this terminal window to stop the server.
 echo ===============================================================================
 echo.
 
-:: Launch browser in background after short delay
-start "" cmd /c "timeout /t 2 /nobreak >nul && start http://127.0.0.1:8765"
+:: Launch browser in background after short delay (PowerShell with ping fallback)
+start "" powershell -NoProfile -WindowStyle Hidden -Command "Start-Sleep -Seconds 2; Start-Process http://127.0.0.1:8765" 2>nul || start "" cmd /c "ping -n 3 127.0.0.1 >nul & start http://127.0.0.1:8765"
 
 :: Start the application
 if defined UV_CMD (
-    !UV_CMD! run ila serve --host 127.0.0.1 --port 8765
+    !UV_CMD! run ila serve --host 127.0.0.1 --port 8765 --open
 ) else (
-    .venv\Scripts\ila.exe serve --host 127.0.0.1 --port 8765
+    .venv\Scripts\ila.exe serve --host 127.0.0.1 --port 8765 --open
 )
 
 pause
