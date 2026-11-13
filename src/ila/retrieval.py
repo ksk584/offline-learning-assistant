@@ -812,11 +812,11 @@ def _llm_answer(
     if not retrieved:
         return None
 
-    # Compact curated context snippets (keep under ~600 chars to minimize prompt prefill latency)
+    # Compact curated context snippets (keep under ~440 chars to minimize prompt prefill latency)
     context_parts: list[str] = []
     for item in retrieved[:2]:
         clean_txt = clean_markdown(item.passage.text)
-        snippet = clean_txt[:260].rsplit(" ", 1)[0] if len(clean_txt) > 260 else clean_txt
+        snippet = clean_txt[:220].rsplit(" ", 1)[0] if len(clean_txt) > 220 else clean_txt
         context_parts.append(f"[{item.passage.title}]: {snippet}")
     compact_context = "\n".join(context_parts)
 
@@ -824,10 +824,10 @@ def _llm_answer(
         {
             "role": "system",
             "content": (
-                "You are an expert NCERT tutor for CBSE Class 10. "
-                "Provide a direct, high-yield explanation grounded in the NCERT syllabus excerpts.\n"
-                "State the core definition, key formulas or sets in LaTeX notation ($p/q$, $\\sqrt{2}$, $\\mathbb{R} = \\mathbb{Q} \\cup \\mathbb{I}$, $b^2 - 4ac$), "
-                "and NCERT classification. Keep it concise (2 short pedagogical paragraphs or bullet points)."
+                "You are an expert CBSE Class 10 NCERT tutor. "
+                "Provide a direct, high-yield 2-3 sentence explanation grounded strictly in the excerpt. "
+                "State core definitions, key formulas in LaTeX notation ($...$), or properties. "
+                "Be clear, precise, and pedagogical. Do NOT include section titles or introductory boilerplate."
             ),
         },
         {
@@ -838,7 +838,7 @@ def _llm_answer(
     try:
         if not llm.available:
             return None
-        reply = llm.complete(messages, max_tokens=120, temperature=0.1).strip()
+        reply = llm.complete(messages, max_tokens=65, temperature=0.1).strip()
     except Exception:
         logger.debug("LLM Q&A generation failed", exc_info=True)
         return None

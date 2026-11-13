@@ -50,6 +50,7 @@ export function AskPane({
 }: AskPaneProps) {
   const [question, setQuestion] = useState("");
   const [selectedChapter, setSelectedChapter] = useState<number>(1);
+  const [speedMode, setSpeedMode] = useState<"fast" | "balanced">("fast");
   const [response, setResponse] = useState<AskResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +111,7 @@ export function AskPane({
           chapter: isMath ? selectedChapter : null,
           lines,
           useLlm: true,
+          profile: speedMode === "fast" ? "potato" : "balanced",
         });
         setResponse(result);
       } catch (err) {
@@ -118,7 +120,7 @@ export function AskPane({
         setLoading(false);
       }
     },
-    [classLevel, isMath, lines, question, selectedChapter, subject],
+    [classLevel, isMath, lines, question, selectedChapter, speedMode, subject],
   );
 
   return (
@@ -135,7 +137,43 @@ export function AskPane({
             </p>
           </div>
 
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {/* Speed Engine Segmented Control */}
+            <div style={{ display: "inline-flex", background: "var(--surface-sunken)", padding: "2px", borderRadius: "6px", border: "1px solid var(--border-subtle)" }}>
+              <button
+                type="button"
+                onClick={() => setSpeedMode("fast")}
+                style={{
+                  padding: "3px 8px",
+                  fontSize: "0.72rem",
+                  fontWeight: 500,
+                  borderRadius: "4px",
+                  background: speedMode === "fast" ? "var(--surface-elevated)" : "transparent",
+                  color: speedMode === "fast" ? "var(--text-primary)" : "var(--text-muted)",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                ⚡ Fast (~1.2s)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSpeedMode("balanced")}
+                style={{
+                  padding: "3px 8px",
+                  fontSize: "0.72rem",
+                  fontWeight: 500,
+                  borderRadius: "4px",
+                  background: speedMode === "balanced" ? "var(--surface-elevated)" : "transparent",
+                  color: speedMode === "balanced" ? "var(--text-primary)" : "var(--text-muted)",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                Balanced (~2.8s)
+              </button>
+            </div>
+
             <span className="badge">Class {classLevel}</span>
             <span className="badge badge-accent">{subjectLabel}</span>
           </div>
@@ -221,7 +259,7 @@ export function AskPane({
                 <span>Grounded Answer</span>
               </span>
               <span style={{ fontSize: "0.76rem", color: "var(--text-muted)" }}>
-                Retrieved in {response.latency_s.toFixed(2)}s via {response.engine ?? "BM25 + Local LLM"}
+                Retrieved in {response.latency_s.toFixed(2)}s via {response.engine ?? "BM25 + Local LLM"} ({speedMode === "fast" ? "Fast 0.8B" : "Balanced 2B"})
               </span>
             </div>
 

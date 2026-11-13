@@ -110,6 +110,7 @@ export interface AskOptions {
   chapter?: number | null;
   topK?: number;
   useLlm?: boolean;
+  profile?: string;
 }
 
 export function askQuestion(options: AskOptions): Promise<AskResponse> {
@@ -124,6 +125,7 @@ export function askQuestion(options: AskOptions): Promise<AskResponse> {
       chapter: options.chapter ?? null,
       top_k: options.topK ?? 5,
       use_llm: options.useLlm ?? true,
+      profile: options.profile ?? "potato",
     }),
   });
 }

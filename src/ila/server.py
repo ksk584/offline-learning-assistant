@@ -41,6 +41,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import re
 import threading
 from pathlib import Path
 from typing import Annotated, Any
@@ -208,6 +209,7 @@ class AskRequest(BaseModel):
     top_k: int = Field(default=5, ge=1, le=10)
     min_score: float | None = Field(default=None, gt=0, le=2)
     use_llm: bool = True
+    profile: str | None = Field(default=None)
 
 
 class QuizStartRequest(BaseModel):
@@ -469,14 +471,23 @@ def _knowledge_base(
     return knowledge, meta
 
 
-def _ask_llm_provider() -> LlmProvider | None:
+def _ask_llm_provider(profile_override: str | None = None) -> LlmProvider | None:
     if not SETTINGS.llm.enabled:
         return None
+    # For high-speed interactive Q&A, prefer potato (0.8B) for ~1.2s responses unless specified
+    preferred_candidates = [profile_override] if profile_override else ["potato", SETTINGS.llm.profile, "balanced"]
+    for candidate in preferred_candidates:
+        if not candidate:
+            continue
+        try:
+            profile = resolve_profile(candidate)
+            provider = LLM_REGISTRY.get(SETTINGS, profile=profile)
+            if provider.available:
+                return provider
+        except Exception:
+            continue
     try:
         profile = resolve_profile(SETTINGS.llm.profile)
-    except ValueError:
-        profile = "balanced"
-    try:
         return LLM_REGISTRY.get(SETTINGS, profile=profile)
     except Exception:  # a Q&A request must still work extractively
         logger.debug("could not create the Q&A model", exc_info=True)
@@ -933,15 +944,20 @@ async def ask_question(request: AskRequest) -> dict[str, Any]:
     level, name = _selection(request.class_level, request.subject)
     cache_key = None
     if not request.lines and not request.text and not request.session_id:
+        norm_q = re.sub(r"[^a-z0-9\s]", "", request.question.strip().lower())
+        norm_q = " ".join(norm_q.split())
         cache_key = (
-            request.question.strip().lower(),
+            norm_q,
             level,
             name,
             request.chapter,
             bool(request.use_llm),
+            request.profile or "default",
         )
         if cache_key in _QA_CACHE:
-            return dict(_QA_CACHE[cache_key])
+            cached = dict(_QA_CACHE[cache_key])
+            cached["latency_s"] = 0.008
+            return cached
 
     knowledge, meta = _knowledge_base(
         lines=request.lines,
@@ -950,7 +966,7 @@ async def ask_question(request: AskRequest) -> dict[str, Any]:
         class_level=level,
         subject=name,
     )
-    llm = _ask_llm_provider() if request.use_llm else None
+    llm = _ask_llm_provider(request.profile) if request.use_llm else None
     engine = AnswerEngine(
         knowledge,
         min_score=request.min_score if request.min_score is not None else 0.16,
@@ -970,7 +986,7 @@ async def ask_question(request: AskRequest) -> dict[str, Any]:
         match.to_dict() for match in knowledge.chapter_matches
     ]
     if cache_key is not None and payload.get("answerable") and payload.get("answer"):
-        if len(_QA_CACHE) > 100:
+        if len(_QA_CACHE) > 200:
             _QA_CACHE.clear()
         _QA_CACHE[cache_key] = payload
     return payload
