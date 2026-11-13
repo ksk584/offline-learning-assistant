@@ -34,12 +34,20 @@ const NCERT_MATH_CHAPTERS = [
 ];
 
 const MATH_SUGGESTIONS: Record<number, string[]> = {
-  1: ["State the Fundamental Theorem of Arithmetic.", "Prove that √2 is an irrational number."],
-  2: ["What is the relationship between zeroes and coefficients of a quadratic polynomial?"],
-  3: ["What are the consistency conditions for a pair of linear equations?"],
-  4: ["State the quadratic formula and explain the discriminant b² - 4ac."],
-  5: ["What is the formula for the nth term and sum of an Arithmetic Progression?"],
+  1: ["State the Fundamental Theorem of Arithmetic.", "Find HCF and LCM of 12 and 18 using prime factorisation."],
+  2: ["What is the relationship between zeroes and coefficients of a quadratic polynomial?", "Find zeroes of x² + 7x + 10."],
+  3: ["What are the consistency conditions for a pair of linear equations?", "Solve x + y = 14 and x - y = 4 by substitution."],
+  4: ["State the quadratic formula and explain the discriminant b² - 4ac.", "Solve 2x² - 7x + 3 = 0 using the quadratic formula."],
+  5: ["What is the formula for the nth term and sum of an Arithmetic Progression?", "Find the 20th term of the AP 2, 7, 12, ..."],
+  6: ["State and explain the Basic Proportionality Theorem (Thales Theorem)."],
+  7: ["State the distance formula and section formula in Coordinate Geometry."],
   8: ["Define the basic trigonometric ratios sine, cosine, and tangent."],
+  9: ["If an observer is 30 m from a tower and angle of elevation is 45°, find tower height."],
+  10: ["State and prove that tangents drawn from an external point to a circle are equal."],
+  11: ["What is the formula for the area of a sector of angle θ of a circle?"],
+  12: ["State the formulas for surface area and volume of a cylinder, cone, and sphere."],
+  13: ["State the relationship between mean, median, and mode (empirical relationship)."],
+  14: ["A die is thrown once. Find the probability of getting a prime number."],
 };
 
 export function AskPane({
@@ -65,8 +73,10 @@ export function AskPane({
       ];
     }
     return [
-      "What are the primary principles demonstrated in this chapter?",
-      "State the key NCERT definitions for this topic.",
+      "What is the difference between a concave and convex mirror?",
+      "An object is placed at 2F of a convex lens. Explain where the image is formed.",
+      "State Ohm's Law and calculate the resistance if V = 12V and I = 2A.",
+      "Explain the mirror formula and magnification with sign conventions.",
     ];
   }, [isMath, selectedChapter]);
 
@@ -208,7 +218,7 @@ export function AskPane({
         >
           <input
             type="text"
-            placeholder="Ask any syllabus concept, theorem, definition, or formula…"
+            placeholder="Ask syllabus concepts, formulas, or new numerical problems to solve…"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             disabled={loading}

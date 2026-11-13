@@ -130,3 +130,35 @@ def test_content_terms_strip_question_meta_words() -> None:
     assert "reflect" in terms
     assert "explain" not in terms
     assert "definition" not in terms
+
+
+def test_llm_answer_solves_new_question_with_textbook_techniques() -> None:
+    from dataclasses import dataclass
+    from ila.retrieval import _llm_answer
+
+    @dataclass
+    class MockLLM:
+        available: bool = True
+
+        def complete(self, messages: list[dict[str, str]], max_tokens: int = 320, temperature: float = 0.1) -> str:
+            return (
+                "**Core Concept & Formula**:\n"
+                "According to NCERT Chapter 4, a quadratic equation ax^2 + bx + c = 0 is solved using the "
+                "quadratic formula: x = (-b +- sqrt(b^2 - 4ac))/(2a).\n\n"
+                "**Step-by-Step Solution**:\n"
+                "1. Identify coefficients: a = 2, b = -7, c = 3.\n"
+                "2. Compute the discriminant: D = b^2 - 4ac = (-7)^2 - 4(2)(3) = 49 - 24 = 25.\n"
+                "3. Substitute into formula: x = (7 +- 5)/4.\n"
+                "4. Roots are x = 3 and x = 0.5.\n\n"
+                "**Key Takeaway**: The roots are x = 3 and x = 1/2."
+            )
+
+    base = KnowledgeBase.from_lines([], 10, "maths")
+    retrieved = base.search("Solve 2x^2 - 7x + 3 = 0 using quadratic formula", top_k=3)
+    assert retrieved, "Should retrieve relevant NCERT chapter passages"
+    answer = _llm_answer(MockLLM(), "Solve 2x^2 - 7x + 3 = 0 using quadratic formula", retrieved)
+    assert answer is not None
+    assert "quadratic formula" in answer
+    assert "Step-by-Step Solution" in answer
+    assert "x = 3" in answer
+

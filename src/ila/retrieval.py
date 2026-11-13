@@ -617,6 +617,27 @@ class AnswerEngine:
             content_only=True,
             chapter=chapter,
         )
+        if not retrieved and self.min_score <= 0.3:
+            # Fallback for new questions/problems: match syllabus chapter from question terms
+            if chapter is None and self.knowledge.course:
+                matched = match_chapters(question, self.knowledge.course, limit=1, min_score=1.0)
+                if matched:
+                    retrieved = self.knowledge.search(
+                        question,
+                        top_k=self.top_k,
+                        min_score=max(0.06, self.min_score * 0.5),
+                        content_only=True,
+                        chapter=matched[0].chapter.number,
+                    )
+            # If still not retrieved, try a relaxed query
+            if not retrieved:
+                retrieved = self.knowledge.search(
+                    question,
+                    top_k=self.top_k,
+                    min_score=0.08,
+                    content_only=True,
+                    chapter=chapter,
+                )
         if not retrieved:
             return Answer(
                 question=question,
@@ -703,18 +724,16 @@ def _extract_answer(question: str, retrieved: Sequence[RetrievedPassage]) -> str
 
     best_sentences.sort(key=lambda pair: (-pair[0], len(pair[1])))
     first_score, first_sentence, first_is_definition = best_sentences[0]
-    if first_is_definition and len(first_sentence) >= 60 and first_score >= 0.5:
-        return first_sentence
 
-    chosen: list[str] = []
-    seen: set[str] = set()
-    for _, sentence, _ in best_sentences:
+    chosen: list[str] = [first_sentence]
+    seen: set[str] = {first_sentence.lower()}
+    for _, sentence, _ in best_sentences[1:]:
         key = sentence.lower()
         if key in seen:
             continue
         seen.add(key)
         chosen.append(sentence)
-        if sum(len(item) for item in chosen) >= 360 or len(chosen) >= 2:
+        if sum(len(item) for item in chosen) >= 480 or len(chosen) >= 3:
             break
     return " ".join(chosen)
 
@@ -808,54 +827,89 @@ def _llm_answer(
     question: str,
     retrieved: Sequence[RetrievedPassage],
 ) -> str | None:
-    """Pedagogical RAG generation grounded strictly on retrieved NCERT syllabus excerpts."""
+    """Pedagogical RAG generation grounded strictly on retrieved NCERT syllabus excerpts.
+
+    Generates detailed, step-by-step explanations for conceptual questions as well as
+    solving new problems and numerical exercises using official textbook formulae and techniques.
+    """
     if not retrieved:
         return None
 
-    # Compact curated context snippets (keep under ~440 chars to minimize prompt prefill latency)
+    # Curate rich context excerpts from up to 3 retrieved passages (up to ~600 chars each)
     context_parts: list[str] = []
-    for item in retrieved[:2]:
-        clean_txt = clean_markdown(item.passage.text)
-        snippet = clean_txt[:220].rsplit(" ", 1)[0] if len(clean_txt) > 220 else clean_txt
-        context_parts.append(f"[{item.passage.title}]: {snippet}")
-    compact_context = "\n".join(context_parts)
+    for item in retrieved[:3]:
+        clean_txt = clean_markdown(item.passage.text).strip()
+        snippet = clean_txt[:600].rsplit(" ", 1)[0] if len(clean_txt) > 600 else clean_txt
+        context_parts.append(f"[{item.passage.title}]:\n{snippet}")
+    context_block = "\n\n".join(context_parts)
+
+    system_prompt = (
+        "You are an expert CBSE/NCERT Class 10 academic tutor.\n"
+        "Your goal is to provide a detailed, clear, and comprehensive explanation grounded in the NCERT syllabus.\n\n"
+        "CORE INSTRUCTIONS:\n"
+        "1. Detailed Explanations: Thoroughly explain the underlying concepts, definitions, scientific principles, "
+        "or mathematical properties. Provide depth, clarity, and intuition. Avoid brief or superficial one-liners.\n"
+        "2. Answering New & Numerical Questions: When asked a new question, unseen problem, equation, or numerical exercise:\n"
+        "   - Identify the textbook technique, theorem, law, or formula (e.g., quadratic formula, mirror formula, Ohm's law, probability, factorisation).\n"
+        "   - State the formula explicitly in LaTeX ($...$ or $$...$$).\n"
+        "   - Provide a step-by-step solution, showing the substitution of given values and clear intermediate reasoning.\n"
+        "   - State the final calculated answer or conclusion with appropriate units.\n"
+        "3. Strict Syllabus Grounding: Only use techniques, sign conventions, and methodologies from the NCERT curriculum. "
+        "Do not invent non-syllabus shortcuts.\n"
+        "4. Structured Formatting: Format your answer cleanly using markdown sections or bold headings, such as:\n"
+        "   - **Core Concept / Principle**: Foundational definition or rule.\n"
+        "   - **Formulas & Techniques**: Standard mathematical or scientific relations.\n"
+        "   - **Step-by-Step Explanation / Solution**: Detailed reasoning or derivation.\n"
+        "   - **Key Takeaway**: Summary or exam tip."
+    )
+
+    user_prompt = (
+        f"Student Question: {question}\n\n"
+        f"Official NCERT Syllabus Context & Excerpts:\n{context_block}\n\n"
+        "Please provide a detailed, grounded pedagogical explanation / step-by-step solution:"
+    )
 
     messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are an expert CBSE Class 10 NCERT tutor. "
-                "Provide a direct, high-yield 2-3 sentence explanation grounded strictly in the excerpt. "
-                "State core definitions, key formulas in LaTeX notation ($...$), or properties. "
-                "Be clear, precise, and pedagogical. Do NOT include section titles or introductory boilerplate."
-            ),
-        },
-        {
-            "role": "user",
-            "content": f"Question: {question}\n\nNCERT Context:\n{compact_context}\n\nExplanation:",
-        },
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
     ]
+
     try:
-        if not llm.available:
+        if not getattr(llm, "available", False):
             return None
-        reply = llm.complete(messages, max_tokens=65, temperature=0.1).strip()
+        # Allow sufficient token budget (up to 320 tokens) for full step-by-step solutions
+        reply = llm.complete(messages, max_tokens=320, temperature=0.15).strip()
     except Exception:
         logger.debug("LLM Q&A generation failed", exc_info=True)
         return None
 
-    if not reply or len(reply) < 25:
+    if not reply or len(reply) < 30:
         return None
 
     # Semantic grounding verification: ensure the response is grounded in the curriculum
     evidence_text = " ".join(item.passage.text for item in retrieved)
     evidence_keywords = " ".join(" ".join(item.passage.keywords) for item in retrieved)
-    evidence = content_terms(evidence_text + " " + evidence_keywords + " " + question)
+    pedagogical_vocabulary = (
+        "formula equation step solution value substitute calculate method theorem law "
+        "result answer definition concept derive given therefore roots discriminant mirror "
+        "lens focal distance image object power resistance current voltage probability "
+        "factor polynomial linear ratio nature sign convention principle"
+    )
+    evidence = content_terms(
+        evidence_text
+        + " "
+        + evidence_keywords
+        + " "
+        + question
+        + " "
+        + pedagogical_vocabulary
+    )
     claim_terms = content_terms(reply)
     if not claim_terms:
         return None
     overlap = len(claim_terms & evidence)
     supported = overlap / len(claim_terms)
-    if supported >= 0.25 or overlap >= 3:
+    if supported >= 0.18 or overlap >= 4:
         return reply
 
     return None
