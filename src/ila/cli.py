@@ -714,8 +714,17 @@ def serve(
 
     if open_browser:
         def _open() -> None:
-            time.sleep(1.2)
+            import socket
             url_host = "127.0.0.1" if actual_host in ("0.0.0.0", "127.0.0.1", "localhost") else actual_host
+            # Poll until the uvicorn socket is actively accepting connections (up to 30s)
+            for _ in range(60):
+                time.sleep(0.5)
+                try:
+                    with socket.create_connection((url_host, actual_port), timeout=0.5):
+                        break
+                except OSError:
+                    continue
+            time.sleep(0.2)
             try:
                 webbrowser.open(f"http://{url_host}:{actual_port}")
             except Exception:

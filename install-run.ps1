@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Singular setup and runner for Offline Intelligent Learning Assistant (ILA).
     Works on any Windows device with Python 3.11+.
@@ -51,6 +51,8 @@ Write-Host "[*] Checking package manager (uv)..." -ForegroundColor Yellow
 $UvCmd = $null
 if (Get-Command uv -ErrorAction SilentlyContinue) {
     $UvCmd = "uv"
+} elseif (Test-Path "$env:USERPROFILE\.local\bin\uv.exe") {
+    $UvCmd = "$env:USERPROFILE\.local\bin\uv.exe"
 } elseif (Test-Path "$env:USERPROFILE\.cargo\bin\uv.exe") {
     $UvCmd = "$env:USERPROFILE\.cargo\bin\uv.exe"
 } elseif (Test-Path "$env:LOCALAPPDATA\uv\uv.exe") {
@@ -132,8 +134,16 @@ Write-Host "====================================================================
 Write-Host ""
 
 Start-Job -ScriptBlock {
-    Start-Sleep -Seconds 2
-    Start-Process "http://127.0.0.1:8765"
+    for ($i = 0; $i -lt 40; $i++) {
+        Start-Sleep -Milliseconds 500
+        try {
+            $tcp = New-Object System.Net.Sockets.TcpClient
+            $tcp.Connect("127.0.0.1", 8765)
+            $tcp.Close()
+            Start-Process "http://127.0.0.1:8765"
+            break
+        } catch {}
+    }
 } | Out-Null
 
 if ($UvCmd) {
