@@ -822,6 +822,40 @@ def _confidence(score: float, result_count: int) -> float:
     return round(max(0.0, base), 3)
 
 
+def _clean_llm_reply(reply: str) -> str:
+    """Trim any trailing unfinished sentences, dangling list numbers, or truncated fragments."""
+    lines = reply.strip().splitlines()
+    while lines:
+        last = lines[-1].strip()
+        # Drop dangling list indicators like '4.', 'Step 2:', '-', '*'
+        if re.match(r"^(\d+[\.\)]|[\*\-\+]|Step\s+\d+:?)\s*$", last, re.I):
+            lines.pop()
+            continue
+        # Drop lines ending with dangling conjunctions or prepositions
+        if re.search(r"(?:^#+|\b(?:where|for|with|and|or|the|a|an|to|of|is|are|in))\s*$", last, re.I):
+            lines.pop()
+            continue
+        break
+
+    cleaned = "\n".join(lines).strip()
+    if not cleaned:
+        return ""
+
+    # Ensure response ends cleanly on a sentence or formula terminator
+    if not cleaned.endswith((".", "!", "?", "}", "$", "*", "```", ")")):
+        last_punct = max(
+            cleaned.rfind("."),
+            cleaned.rfind("!"),
+            cleaned.rfind("?"),
+            cleaned.rfind("$"),
+            cleaned.rfind("\n\n"),
+        )
+        if last_punct > len(cleaned) * 0.6:
+            cleaned = cleaned[: last_punct + 1].strip()
+
+    return cleaned
+
+
 def _llm_answer(
     llm: LlmProvider,
     question: str,
@@ -829,8 +863,8 @@ def _llm_answer(
 ) -> str | None:
     """Pedagogical RAG generation grounded strictly on retrieved NCERT syllabus excerpts.
 
-    Generates detailed, step-by-step explanations for conceptual questions as well as
-    solving new problems and numerical exercises using official textbook formulae and techniques.
+    Generates complete, high-yield explanations for conceptual questions as well as
+    step-by-step problem solving for numerical exercises using textbook formulae and techniques.
     """
     if not retrieved:
         return None
@@ -845,25 +879,24 @@ def _llm_answer(
 
     system_prompt = (
         "You are an expert CBSE/NCERT Class 10 academic tutor.\n"
-        "Your goal is to provide a complete, detailed, and syllabus-grounded explanation or step-by-step solution.\n\n"
-        "CORE INSTRUCTIONS:\n"
-        "1. Complete Explanations: Thoroughly explain the underlying concepts, definitions, scientific principles, "
-        "or mathematical properties. Always finish every explanation and step completely. Do NOT stop halfway.\n"
-        "2. Answering New & Numerical Questions: When asked a new question, unseen problem, equation, or numerical exercise:\n"
-        "   - State the relevant NCERT formula explicitly in LaTeX notation ($...$ or $$...$$).\n"
-        "   - Provide clear, numbered steps with substitutions and intermediate calculations.\n"
-        "   - Always conclude with the final calculated answer or deduction with appropriate units.\n"
-        "3. Strict Syllabus Grounding: Only use techniques, sign conventions, and methodologies from the NCERT curriculum.\n"
-        "4. Structured Format:\n"
-        "   - **Core Concept & Formula**: Essential principle and LaTeX formula.\n"
-        "   - **Step-by-Step Solution / Explanation**: Numbered steps with clear calculations.\n"
-        "   - **Final Answer**: Concluding result and takeaway."
+        "Your goal is to provide a complete, clear, syllabus-grounded answer that never cuts off.\n\n"
+        "GUIDELINES:\n"
+        "1. Conciseness & Completeness: Keep your answer tightly focused, well-structured, and under 250 words so it finishes completely. Never leave a sentence, formula, or calculation step incomplete.\n"
+        "2. For Conceptual Questions (e.g., definitions, laws, principles):\n"
+        "   - Provide the official NCERT definition and primary scientific principles.\n"
+        "   - Mention key properties and standard formulas in LaTeX notation ($...$).\n"
+        "   - Conclude with real-world applications or takeaways.\n"
+        "3. For Numerical & Problem-Solving Questions (including unseen or new problems):\n"
+        "   - State the relevant NCERT formula or theorem ($...$).\n"
+        "   - Provide 2-3 brief numbered steps with values substituted.\n"
+        "   - Conclude with the final calculated answer ($...$).\n"
+        "4. Always conclude cleanly with a final answer or takeaway. Do not trail off or write open-ended text."
     )
 
     user_prompt = (
         f"Student Question: {question}\n\n"
         f"Official NCERT Syllabus Context & Excerpts:\n{context_block}\n\n"
-        "Please provide a complete, detailed, grounded pedagogical explanation / step-by-step solution:"
+        "Answer:"
     )
 
     messages = [
@@ -874,7 +907,7 @@ def _llm_answer(
     try:
         if not getattr(llm, "available", False):
             return None
-        # Allow ample token budget (up to 650 tokens) for complete step-by-step solutions
+        # Allow ample token budget (up to 650 tokens) for complete solutions
         reply = llm.complete(messages, max_tokens=650, temperature=0.15).strip()
     except Exception:
         logger.debug("LLM Q&A generation failed", exc_info=True)
@@ -883,11 +916,9 @@ def _llm_answer(
     if not reply or len(reply) < 30:
         return None
 
-    # Clean any trailing cut-off fragment if generation abruptly ended
-    if reply and not reply.endswith((".", "!", "?", "}", "$", "*", "\n", "```")):
-        last_period = max(reply.rfind("."), reply.rfind("\n"), reply.rfind("$"))
-        if last_period > len(reply) * 0.7:
-            reply = reply[: last_period + 1].strip()
+    reply = _clean_llm_reply(reply)
+    if not reply or len(reply) < 30:
+        return None
 
     # Semantic grounding verification: ensure the response is grounded in the curriculum
     evidence_text = " ".join(item.passage.text for item in retrieved)

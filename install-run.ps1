@@ -133,6 +133,18 @@ Write-Host "  Press Ctrl+C in this terminal window to stop the server." -Foregro
 Write-Host "===============================================================================" -ForegroundColor Cyan
 Write-Host ""
 
+# Free port 8765 if an older background instance is still holding it
+$staleConns = Get-NetTCPConnection -LocalPort 8765 -ErrorAction SilentlyContinue
+if ($staleConns) {
+    Write-Host "[*] Freeing port 8765 from previous instance..." -ForegroundColor Yellow
+    foreach ($conn in $staleConns) {
+        if ($conn.OwningProcess -and $conn.OwningProcess -ne $PID) {
+            try { Stop-Process -Id $conn.OwningProcess -Force -ErrorAction SilentlyContinue } catch {}
+        }
+    }
+    Start-Sleep -Milliseconds 600
+}
+
 Start-Job -ScriptBlock {
     for ($i = 0; $i -lt 40; $i++) {
         Start-Sleep -Milliseconds 500

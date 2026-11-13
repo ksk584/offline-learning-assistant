@@ -216,6 +216,11 @@ echo   Press Ctrl+C in this terminal window to stop the server.
 echo ===============================================================================
 echo.
 
+:: Ensure port 8765 is free
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8765 ^| findstr LISTENING 2^>nul') do (
+    taskkill /F /PID %%a >nul 2>&1
+)
+
 :: Start background watcher that waits until 127.0.0.1:8765 is actively listening before opening browser
 start "" powershell -NoProfile -WindowStyle Hidden -Command "$done=$false; for($i=0;$i -lt 40;$i++){ Start-Sleep -Milliseconds 500; try { $t=New-Object Net.Sockets.TcpClient; $t.Connect('127.0.0.1', 8765); $t.Close(); $done=$true; break } catch{} }; if($done){ Start-Process 'http://127.0.0.1:8765' }"
 
