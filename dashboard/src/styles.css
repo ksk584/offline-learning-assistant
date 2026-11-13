@@ -2311,6 +2311,16 @@ pre {
 }
 
 
+/* Screen mode toggles for page visibility */
+.study-document-sheet.hidden-screen-page {
+  display: none;
+}
+
+.pdf-pages-container.mode-single .pdf-a4-sheet.other-page {
+  display: none;
+}
+
+
 /* ==========================================================================
    12. PRINT & PDF EXPORT OPTIMIZATIONS (@media print)
    ========================================================================== */
@@ -2331,6 +2341,7 @@ pre {
   html,
   body,
   #root,
+  .app-shell,
   .app-layout {
     display: block !important;
     position: static !important;
@@ -2347,6 +2358,10 @@ pre {
   }
 
   /* 2. Hide All UI Chrome & Non-Printable Elements */
+  .app-header,
+  .app-nav,
+  .header-utils,
+  .connection-banner,
   .navbar,
   .sidebar,
   .caption-panel,
@@ -2410,17 +2425,20 @@ pre {
     transform: none !important;
   }
 
-  /* 4. Notes Panel Study Document Sheets (Textbook Master Notes & Lecture Notes) */
+  /* 4. Notes Panel Study Document Sheets: ALL 10 PAGES PRINT ALWAYS */
+  .study-document-sheet.hidden-screen-page,
   .study-document-sheet {
     display: block !important;
     background: #ffffff !important;
     color: #111827 !important;
     border: 1px solid #e5e7eb !important;
     border-radius: 4px !important;
-    margin: 0 0 16mm 0 !important;
-    padding: 12mm 14mm !important;
+    margin: 0 0 14mm 0 !important;
+    padding: 10mm 12mm !important;
     max-width: 100% !important;
     width: 100% !important;
+    min-height: auto !important;
+    height: auto !important;
     box-sizing: border-box !important;
     page-break-after: always !important;
     break-after: page !important;
@@ -2434,17 +2452,19 @@ pre {
     margin-bottom: 0 !important;
   }
 
-  /* 5. PDF Reader View Sheets */
+  /* 5. PDF Reader View Sheets: ALL 10 PAGES PRINT ALWAYS */
+  .pdf-pages-container.mode-single .pdf-a4-sheet.other-page,
   .pdf-a4-sheet {
     display: block !important;
     background: #ffffff !important;
     color: #111827 !important;
     border: none !important;
-    margin: 0 0 16mm 0 !important;
-    padding: 12mm 14mm !important;
+    margin: 0 0 14mm 0 !important;
+    padding: 10mm 12mm !important;
     width: 100% !important;
     max-width: 100% !important;
     min-height: auto !important;
+    height: auto !important;
     box-sizing: border-box !important;
     page-break-after: always !important;
     break-after: page !important;

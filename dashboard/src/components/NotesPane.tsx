@@ -221,15 +221,7 @@ export function NotesPane({
   };
 
   const handlePrint = () => {
-    // If viewing textbook and a single sub-page was filtered, switch to all 10 pages for print
-    if (activeTab === "textbook" && selectedPage !== "all") {
-      setSelectedPage("all");
-      setTimeout(() => {
-        window.print();
-      }, 120);
-    } else {
-      window.print();
-    }
+    window.print();
   };
 
   const pages = textbookData?.pages || [];
@@ -420,45 +412,51 @@ export function NotesPane({
               </div>
             ) : textbookData ? (
               <div>
-                {(selectedPage === "all"
-                  ? pages
-                  : pages.filter((p) => p.page_number === selectedPage)
-                ).map((page: NcertPage) => (
-                  <article key={page.page_number} className="study-document-sheet">
-                    <div className="sheet-header-meta">
-                      <span>NCERT Class 10 Mathematics · Unit {selectedUnit}</span>
-                      <span>Page {page.page_number} of {pages.length || 10}</span>
-                    </div>
-
-                    <div style={{ marginBottom: 16 }}>
-                      <span className="badge badge-accent" style={{ marginBottom: 6 }}>
-                        Section {page.section_id}
-                      </span>
-                      <h3 className="sheet-section-title">{page.title}</h3>
-                    </div>
-
-                    <div className="markdown">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {page.content}
-                      </ReactMarkdown>
-                    </div>
-
-                    <div
-                      style={{
-                        marginTop: 24,
-                        paddingTop: 12,
-                        borderTop: "1px solid var(--border-subtle)",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: "0.72rem",
-                        color: "var(--text-muted)",
-                      }}
+                {pages.map((page: NcertPage) => {
+                  const isVisibleOnScreen =
+                    selectedPage === "all" || selectedPage === page.page_number;
+                  return (
+                    <article
+                      key={page.page_number}
+                      className={`study-document-sheet ${
+                        isVisibleOnScreen ? "active-screen-page" : "hidden-screen-page"
+                      }`}
                     >
-                      <span>Offline Intelligent Learning Assistant (ILA)</span>
-                      <span>CBSE / NCERT Syllabus Grounded</span>
-                    </div>
-                  </article>
-                ))}
+                      <div className="sheet-header-meta">
+                        <span>NCERT Class 10 Mathematics · Unit {selectedUnit}</span>
+                        <span>Page {page.page_number} of {pages.length || 10}</span>
+                      </div>
+
+                      <div style={{ marginBottom: 16 }}>
+                        <span className="badge badge-accent" style={{ marginBottom: 6 }}>
+                          Section {page.section_id}
+                        </span>
+                        <h3 className="sheet-section-title">{page.title}</h3>
+                      </div>
+
+                      <div className="markdown">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {page.content}
+                        </ReactMarkdown>
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop: 24,
+                          paddingTop: 12,
+                          borderTop: "1px solid var(--border-subtle)",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: "0.72rem",
+                          color: "var(--text-muted)",
+                        }}
+                      >
+                        <span>Offline Intelligent Learning Assistant (ILA)</span>
+                        <span>CBSE / NCERT Syllabus Grounded</span>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             ) : (
               <p style={{ textAlign: "center", color: "var(--text-muted)", padding: 40 }}>

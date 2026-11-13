@@ -123,14 +123,7 @@ export function PdfNotesViewer({ initialUnit = 1 }: PdfNotesViewerProps) {
   };
 
   const handlePrint = () => {
-    if (viewMode !== "continuous") {
-      setViewMode("continuous");
-      setTimeout(() => {
-        window.print();
-      }, 120);
-    } else {
-      window.print();
-    }
+    window.print();
   };
 
   const toggleFullscreen = () => {
@@ -386,90 +379,54 @@ export function PdfNotesViewer({ initialUnit = 1 }: PdfNotesViewerProps) {
             </div>
           ) : (
             <div
-              className={`pdf-pages-container zoom-${zoomLevel}`}
+              className={`pdf-pages-container zoom-${zoomLevel} mode-${viewMode}`}
               style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: "top center" }}
             >
-              {viewMode === "continuous"
-                ? // Render all 10 pages stacked
-                  pages.map((page: NcertPage, index: number) => (
-                    <article
-                      key={page.page_number}
-                      className="pdf-a4-sheet"
-                      ref={(el) => {
-                        pageRefs.current[index] = el;
-                      }}
-                      id={`pdf-page-${page.page_number}`}
-                    >
-                      {/* Running A4 Page Header */}
-                      <header className="a4-running-header">
-                        <span className="header-subject">NCERT Class 10 Mathematics</span>
-                        <span className="header-chapter">
-                          {noteData?.title} • Section {page.section_id}
-                        </span>
-                        <span className="header-page">Page {page.page_number} of {totalPages}</span>
-                      </header>
+              {pages.map((page: NcertPage, index: number) => {
+                const isCurrent = page.page_number === currentPage;
+                return (
+                  <article
+                    key={page.page_number}
+                    className={`pdf-a4-sheet ${isCurrent ? "current-page" : "other-page"}`}
+                    ref={(el) => {
+                      pageRefs.current[index] = el;
+                    }}
+                    id={`pdf-page-${page.page_number}`}
+                    data-page-number={page.page_number}
+                  >
+                    {/* Running A4 Page Header */}
+                    <header className="a4-running-header">
+                      <span className="header-subject">NCERT Class 10 Mathematics</span>
+                      <span className="header-chapter">
+                        {noteData?.title} • Section {page.section_id}
+                      </span>
+                      <span className="header-page">Page {page.page_number} of {totalPages}</span>
+                    </header>
 
-                      {/* A4 Page Content Area */}
-                      <div className="a4-content-area">
-                        <div className="section-title-badge">
-                          <span className="badge-pill">Section {page.section_id}</span>
-                          <h2 className="page-heading">{page.title}</h2>
-                        </div>
-                        <div className="a4-markdown-body">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {page.content}
-                          </ReactMarkdown>
-                        </div>
+                    {/* A4 Page Content Area */}
+                    <div className="a4-content-area">
+                      <div className="section-title-badge">
+                        <span className="badge-pill">Section {page.section_id}</span>
+                        <h2 className="page-heading">{page.title}</h2>
                       </div>
+                      <div className="a4-markdown-body">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {page.content}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
 
-                      {/* Running A4 Page Footer */}
-                      <footer className="a4-running-footer">
-                        <span className="footer-org">Offline Intelligent Learning Assistant (ILA) · SDG 4</span>
-                        <span className="footer-page-badge">
-                          — Page {page.page_number} of {totalPages} —
-                        </span>
-                        <span className="footer-curriculum">CBSE / NCERT Standard</span>
-                      </footer>
-                    </article>
-                  ))
-                : // Render only current active page
-                  pages
-                    .filter((p) => p.page_number === currentPage)
-                    .map((page: NcertPage) => (
-                      <article
-                        key={page.page_number}
-                        className="pdf-a4-sheet"
-                        id={`pdf-page-${page.page_number}`}
-                      >
-                        <header className="a4-running-header">
-                          <span className="header-subject">NCERT Class 10 Mathematics</span>
-                          <span className="header-chapter">
-                            {noteData?.title} • Section {page.section_id}
-                          </span>
-                          <span className="header-page">Page {page.page_number} of {totalPages}</span>
-                        </header>
-
-                        <div className="a4-content-area">
-                          <div className="section-title-badge">
-                            <span className="badge-pill">Section {page.section_id}</span>
-                            <h2 className="page-heading">{page.title}</h2>
-                          </div>
-                          <div className="a4-markdown-body">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              {page.content}
-                            </ReactMarkdown>
-                          </div>
-                        </div>
-
-                        <footer className="a4-running-footer">
-                          <span className="footer-org">Offline Intelligent Learning Assistant (ILA) · SDG 4</span>
-                          <span className="footer-page-badge">
-                            — Page {page.page_number} of {totalPages} —
-                          </span>
-                          <span className="footer-curriculum">CBSE / NCERT Standard</span>
-                        </footer>
-                      </article>
-                    ))}
+                    {/* Running A4 Page Footer */}
+                    <footer className="a4-running-footer">
+                      <span className="footer-org">Offline Intelligent Learning Assistant (ILA) · SDG 4</span>
+                      <span className="footer-page-badge">
+                        — Page {page.page_number} of {totalPages} —
+                      </span>
+                      <span className="footer-curriculum">CBSE / NCERT Standard</span>
+                    </footer>
+                  </article>
+                );
+              })}
             </div>
           )}
         </main>
