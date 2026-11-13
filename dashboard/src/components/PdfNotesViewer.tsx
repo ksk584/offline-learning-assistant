@@ -123,7 +123,14 @@ export function PdfNotesViewer({ initialUnit = 1 }: PdfNotesViewerProps) {
   };
 
   const handlePrint = () => {
-    window.print();
+    if (viewMode !== "continuous") {
+      setViewMode("continuous");
+      setTimeout(() => {
+        window.print();
+      }, 120);
+    } else {
+      window.print();
+    }
   };
 
   const toggleFullscreen = () => {

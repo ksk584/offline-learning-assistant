@@ -220,6 +220,18 @@ export function NotesPane({
     URL.revokeObjectURL(url);
   };
 
+  const handlePrint = () => {
+    // If viewing textbook and a single sub-page was filtered, switch to all 10 pages for print
+    if (activeTab === "textbook" && selectedPage !== "all") {
+      setSelectedPage("all");
+      setTimeout(() => {
+        window.print();
+      }, 120);
+    } else {
+      window.print();
+    }
+  };
+
   const pages = textbookData?.pages || [];
 
   return (
@@ -267,7 +279,7 @@ export function NotesPane({
           <button
             type="button"
             className="btn-icon"
-            onClick={() => window.print()}
+            onClick={handlePrint}
             title="Print or Export to PDF"
             aria-label="Print"
           >

@@ -2309,3 +2309,320 @@ pre {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ==========================================================================
+   12. PRINT & PDF EXPORT OPTIMIZATIONS (@media print)
+   ========================================================================== */
+@page {
+  size: A4 portrait;
+  margin: 12mm 14mm 14mm 14mm;
+}
+
+@media print {
+  /* 1. Global Reset: Remove dark theme and unconstrain scrolling/heights */
+  *,
+  *::before,
+  *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  html,
+  body,
+  #root,
+  .app-layout {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  /* 2. Hide All UI Chrome & Non-Printable Elements */
+  .navbar,
+  .sidebar,
+  .caption-panel,
+  .footer-bar,
+  .panel-header,
+  .notes-sub-header,
+  .notes-nav-tabs,
+  .page-filter-bar,
+  .pdf-toolbar,
+  .pdf-outline-sidebar,
+  .modal-overlay,
+  .modal-content,
+  .btn,
+  .btn-icon,
+  .btn-ghost,
+  .btn-primary,
+  .btn-secondary,
+  .spinner,
+  .toast,
+  .status-indicator,
+  .capture-action-row,
+  .session-status-card,
+  .chapter-search-box {
+    display: none !important;
+  }
+
+  /* 3. Unconstrain Layout & Workspace Grid */
+  .layout,
+  .workspace {
+    display: block !important;
+    grid-template-columns: none !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    width: 100% !important;
+  }
+
+  .panel,
+  .notes-panel,
+  .notes-content-viewport,
+  .pdf-viewer-root,
+  .pdf-workspace,
+  .pdf-canvas-viewport,
+  .pdf-pages-container {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    transform: none !important;
+  }
+
+  /* 4. Notes Panel Study Document Sheets (Textbook Master Notes & Lecture Notes) */
+  .study-document-sheet {
+    display: block !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 4px !important;
+    margin: 0 0 16mm 0 !important;
+    padding: 12mm 14mm !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+
+  .study-document-sheet:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+    margin-bottom: 0 !important;
+  }
+
+  /* 5. PDF Reader View Sheets */
+  .pdf-a4-sheet {
+    display: block !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+    border: none !important;
+    margin: 0 0 16mm 0 !important;
+    padding: 12mm 14mm !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    box-sizing: border-box !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+
+  .pdf-a4-sheet:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+    margin-bottom: 0 !important;
+  }
+
+  /* 6. Running Headers, Badges, and Metadata */
+  .sheet-header-meta,
+  .a4-running-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    border-bottom: 1.5px solid #d1d5db !important;
+    color: #4b5563 !important;
+    font-size: 8.5pt !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    padding-bottom: 6px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .a4-running-footer {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    border-top: 1px solid #e5e7eb !important;
+    color: #6b7280 !important;
+    font-size: 8pt !important;
+    padding-top: 8px !important;
+    margin-top: 16px !important;
+  }
+
+  .sheet-section-title,
+  .page-heading {
+    font-size: 15pt !important;
+    font-weight: 700 !important;
+    color: #111827 !important;
+    margin-top: 6px !important;
+    margin-bottom: 12px !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  .badge,
+  .badge-pill,
+  .badge-accent {
+    display: inline-block !important;
+    background: #f1f5f9 !important;
+    color: #1e293b !important;
+    border: 1px solid #cbd5e1 !important;
+    font-size: 8pt !important;
+    font-weight: 600 !important;
+    padding: 2px 7px !important;
+    border-radius: 4px !important;
+  }
+
+  .mapped-correlation-banner {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    background: #f8fafc !important;
+    color: #1e293b !important;
+    border: 1px solid #cbd5e1 !important;
+    padding: 8px 12px !important;
+    margin-bottom: 14px !important;
+    font-size: 9pt !important;
+  }
+
+  /* 7. Markdown Content, Tables, Code, and KaTeX */
+  .markdown,
+  .a4-markdown-body {
+    color: #1f2937 !important;
+    font-size: 10pt !important;
+    line-height: 1.55 !important;
+  }
+
+  .markdown h1,
+  .markdown h2,
+  .markdown h3,
+  .markdown h4,
+  .a4-markdown-body h1,
+  .a4-markdown-body h2,
+  .a4-markdown-body h3,
+  .a4-markdown-body h4 {
+    color: #111827 !important;
+    font-weight: 700 !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  .markdown h1 { font-size: 14pt !important; margin-top: 14px !important; margin-bottom: 8px !important; }
+  .markdown h2 { font-size: 12pt !important; margin-top: 12px !important; margin-bottom: 6px !important; }
+  .markdown h3 { font-size: 11pt !important; margin-top: 10px !important; margin-bottom: 4px !important; }
+
+  .markdown p,
+  .markdown li,
+  .a4-markdown-body p,
+  .a4-markdown-body li {
+    color: #374151 !important;
+    font-size: 9.5pt !important;
+    line-height: 1.5 !important;
+    margin-bottom: 6px !important;
+    orphans: 3 !important;
+    widows: 3 !important;
+  }
+
+  .markdown ul,
+  .markdown ol,
+  .a4-markdown-body ul,
+  .a4-markdown-body ol {
+    padding-left: 20px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .markdown code,
+  .a4-markdown-body code {
+    background: #f3f4f6 !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    padding: 1px 4px !important;
+    border-radius: 3px !important;
+    font-size: 8.5pt !important;
+  }
+
+  .markdown pre,
+  .a4-markdown-body pre {
+    background: #f9fafb !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    padding: 8px 12px !important;
+    border-radius: 4px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin: 8px 0 !important;
+  }
+
+  .markdown table,
+  .a4-markdown-body table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin: 10px 0 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .markdown th,
+  .markdown td,
+  .a4-markdown-body th,
+  .a4-markdown-body td {
+    border: 1px solid #d1d5db !important;
+    padding: 6px 10px !important;
+    color: #1f2937 !important;
+    font-size: 9pt !important;
+    text-align: left !important;
+  }
+
+  .markdown th,
+  .a4-markdown-body th {
+    background: #f3f4f6 !important;
+    font-weight: 600 !important;
+  }
+
+  .katex,
+  .katex-display {
+    color: #111827 !important;
+  }
+
+  .katex-display {
+    margin: 8px 0 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}
