@@ -1,8 +1,23 @@
 @echo off
+setlocal
+cd /d "%~dp0"
+title Offline Intelligent Learning Assistant (ILA) - Setup and Runner
+
+:: -------------------------------------------------------------------------
+:: Prefer PowerShell Engine (Immune to CMD encoding and line-ending quirks)
+:: -------------------------------------------------------------------------
+where powershell >nul 2>&1
+if %ERRORLEVEL% equ 0 (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0install-run.ps1"
+    if %ERRORLEVEL% neq 0 pause
+    exit /b %ERRORLEVEL%
+)
+
+:: -------------------------------------------------------------------------
+:: Pure CMD Fallback (Only executed if PowerShell is completely missing)
+:: -------------------------------------------------------------------------
 chcp 65001 >nul
 setlocal enabledelayedexpansion
-title Offline Intelligent Learning Assistant (ILA) - Setup and Runner
-cd /d "%~dp0"
 
 set "PATH=%USERPROFILE%\.local\bin;%USERPROFILE%\.cargo\bin;%LOCALAPPDATA%\uv;%PATH%"
 
@@ -13,9 +28,7 @@ echo   SDG 4 - Fully Offline Architecture - Zero Cloud Dependency
 echo ===============================================================================
 echo.
 
-:: -------------------------------------------------------------------------
 :: 1. Detect Python
-:: -------------------------------------------------------------------------
 echo [*] Checking Python installation...
 set "PYTHON_CMD="
 
@@ -62,9 +75,7 @@ exit /b 1
 for /f "tokens=*" %%v in ('!PYTHON_CMD! --version 2^>^&1') do set "PY_VER=%%v"
 echo [✓] Found !PY_VER! (!PYTHON_CMD!)
 
-:: -------------------------------------------------------------------------
-:: 2. Check / Install uv (Ultra-Fast Package Manager)
-:: -------------------------------------------------------------------------
+:: 2. Check / Install uv
 echo [*] Checking package manager (uv)...
 set "UV_CMD="
 
@@ -101,7 +112,6 @@ if !errorlevel! equ 0 (
     goto :uv_found
 )
 
-:: Fallback install via powershell script
 powershell -ExecutionPolicy ByPass -Command "irm https://astral.sh/uv/install.ps1 | iex" >nul 2>&1
 if exist "%USERPROFILE%\.local\bin\uv.exe" (
     set "UV_CMD=%USERPROFILE%\.local\bin\uv.exe"
@@ -119,9 +129,7 @@ if defined UV_CMD (
     echo [✓] Package manager ready.
 )
 
-:: -------------------------------------------------------------------------
 :: 3. Setup Virtual Environment and Install Dependencies
-:: -------------------------------------------------------------------------
 echo [*] Setting up Python virtual environment and dependencies...
 
 if defined UV_CMD (
@@ -149,9 +157,7 @@ if defined UV_CMD (
 
 echo [✓] Core dependencies and virtual environment ready.
 
-:: -------------------------------------------------------------------------
 :: 4. Verify / Auto-Download Local LLM Note-Writing Model
-:: -------------------------------------------------------------------------
 echo [*] Checking on-device LLM model...
 set "MODEL_FOUND=0"
 
@@ -180,9 +186,7 @@ echo [✓] Offline LLM model found and verified.
 
 :model_done
 
-:: -------------------------------------------------------------------------
 :: 5. Verify Frontend Web Application
-:: -------------------------------------------------------------------------
 echo [*] Verifying Web Dashboard...
 if not exist "dashboard\dist\index.html" (
     echo [!] Pre-compiled dashboard not found. Checking Node.js/npm to build...
@@ -197,9 +201,7 @@ if not exist "dashboard\dist\index.html" (
     echo [✓] Dashboard is compiled and ready to serve.
 )
 
-:: -------------------------------------------------------------------------
 :: 6. Launch Application Server and Open Browser
-:: -------------------------------------------------------------------------
 echo.
 echo ===============================================================================
 echo   ILA IS READY! STARTING LOCAL SERVER...
