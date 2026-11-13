@@ -665,17 +665,27 @@ def grade_answer_detailed(
             if cleaned.isdigit() and 0 <= int(cleaned) < len(question.options):
                 chosen = question.options[int(cleaned)]
             else:
-                normalized = normalize_answer(cleaned)
                 for option in question.options:
-                    if normalize_answer(option) == normalized:
+                    if option.strip().casefold() == cleaned.casefold():
                         chosen = option
                         break
+                if not chosen:
+                    normalized = normalize_answer(cleaned)
+                    if normalized:
+                        for option in question.options:
+                            if normalize_answer(option) == normalized:
+                                chosen = option
+                                break
         if not chosen:
             return False, "", "No option selected.", "mcq"
-        correct = (
-            question.answer_index is not None
-            and chosen == question.options[question.answer_index]
-        ) or normalize_answer(chosen) == normalize_answer(question.answer)
+        if question.answer_index is not None:
+            correct = (
+                (answer_index is not None and answer_index == question.answer_index)
+                or chosen == question.options[question.answer_index]
+                or chosen.strip().casefold() == question.answer.strip().casefold()
+            )
+        else:
+            correct = chosen.strip().casefold() == question.answer.strip().casefold()
         reason = "Correct option chosen." if correct else f"Selected option: {chosen}"
         return correct, chosen, reason, "mcq"
 
@@ -768,19 +778,34 @@ def _pick_question(
     target_difficulty: int,
     used_ids: set[str],
     mastery: dict[str, float],
+    recent_ids: set[str] | None = None,
+    rng: random.Random | None = None,
 ) -> QuizQuestion | None:
     candidates = [question for question in pool if question.id not in used_ids]
     if not candidates:
         return None
 
-    def sort_key(question: QuizQuestion) -> tuple[float, float, str]:
-        distance = abs(question.difficulty - target_difficulty)
-        topic_score = mastery.get(question.topic, 0.5)
-        # Slightly prefer the topic the learner knows least at equal difficulty.
-        return (distance, topic_score, question.id)
+    _rng = rng or random
 
-    candidates.sort(key=sort_key)
-    return candidates[0]
+    # 1. Filter out recently attempted questions if fresh candidates exist
+    if recent_ids:
+        fresh = [q for q in candidates if q.id not in recent_ids]
+        if fresh:
+            candidates = fresh
+
+    # 2. Find candidates with minimum distance to target difficulty
+    min_dist = min(abs(q.difficulty - target_difficulty) for q in candidates)
+    best_diff_candidates = [q for q in candidates if abs(q.difficulty - target_difficulty) == min_dist]
+
+    # 3. Find candidates addressing lowest mastery topics (within tolerance)
+    min_topic_score = min(mastery.get(q.topic, 0.5) for q in best_diff_candidates)
+    best_pool = [
+        q for q in best_diff_candidates
+        if abs(mastery.get(q.topic, 0.5) - min_topic_score) <= 0.20
+    ]
+
+    # 4. Pick randomly from the qualified pool for variety and non-repetition
+    return _rng.choice(best_pool)
 
 
 @dataclass(slots=True)
@@ -829,16 +854,28 @@ class QuizEngine:
         else:
             target = difficulty
 
+        recent_ids: set[str] = set()
+        try:
+            recent_rows = self.storage.recent_attempts(student_id, limit=40)
+            recent_ids = {row["question_id"] for row in recent_rows if row.get("question_id")}
+        except Exception:
+            pass
+
         first = _pick_question(
             questions,
             target_difficulty=target,
             used_ids=set(),
             mastery=mastery_scores,
+            recent_ids=recent_ids,
         )
         assert first is not None
+
+        remaining = [question.id for question in questions if question.id != first.id]
+        random.shuffle(remaining)
+
         state = {
             "questions": [question.state() for question in questions],
-            "remaining": [question.id for question in questions if question.id != first.id],
+            "remaining": remaining,
             "current": first.id,
             "answered": 0,
             "correct": 0,
@@ -963,6 +1000,14 @@ class QuizEngine:
             for identifier in state.get("remaining", [])
             if identifier in records
         ]
+
+        recent_ids: set[str] = set()
+        try:
+            recent_rows = self.storage.recent_attempts(student_id, limit=40)
+            recent_ids = {row["question_id"] for row in recent_rows if row.get("question_id")}
+        except Exception:
+            pass
+
         next_question = None
         if state["answered"] < int(state["total"]):
             next_question = _pick_question(
@@ -970,6 +1015,7 @@ class QuizEngine:
                 target_difficulty=target,
                 used_ids=set(),
                 mastery=mastery_scores,
+                recent_ids=recent_ids,
             )
         completed = next_question is None
         state["current"] = next_question.id if next_question else None
